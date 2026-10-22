@@ -40,15 +40,15 @@ No chat and no follow-up turns: each request makes a fixed, small number of AI c
 
 ## Technical Decisions
 
-| Layer       | Choice                                                                             |
-| ----------- | ---------------------------------------------------------------------------------- |
-| Client      | React, TypeScript, Vite, TanStack Query                                            |
-| Server      | Node, Express, TypeScript, Zod                                                     |
-| AI          | OpenRouter API (model to be chosen) with structured JSON output                    |
-| Cache       | SQLite, package metadata and README by name and version                            |
-| Tests       | Vitest, React Testing Library, Supertest                                           |
-| Repo and CI | pnpm workspaces monorepo (`client/`, `server/`, `shared/`), GitHub Actions         |
-| Hosting     | Free tier hosting for client and server, to be decided                             |
+| Layer       | Choice                                                                     |
+| ----------- | -------------------------------------------------------------------------- |
+| Client      | React, TypeScript, Vite, TanStack Query                                    |
+| Server      | Node, Express, TypeScript, Zod                                             |
+| AI          | OpenRouter API (model to be chosen) with structured JSON output            |
+| Cache       | SQLite, package metadata and README by name and version                    |
+| Tests       | Vitest, React Testing Library, Supertest                                   |
+| Repo and CI | pnpm workspaces monorepo (`client/`, `server/`, `shared/`), GitHub Actions |
+| Hosting     | Free tier hosting for client and server, to be decided                     |
 
 - `client/`: form, local package.json filtering, preview, report view, export. See `client/AGENTS.md`.
 - `server/`: single `POST /api/report` endpoint, data fetching, caching, AI calls. See `server/AGENTS.md`.

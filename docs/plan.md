@@ -11,7 +11,7 @@ Notes:
 ## Part 1: Plan
 
 - [x] Enrich this document with substeps, tests and success criteria per part
-- [ ] User reviews and approves the plan
+- [x] User reviews and approves the plan
 
 Success criteria: the user approves this document.
 
@@ -21,15 +21,15 @@ Success criteria: the user approves this document.
 - [x] `.gitignore` (node_modules, dist, .env, \*.sqlite)
 - [x] Project name: `dependency-decision`
 - [x] Public GitHub repo: https://github.com/yforsher/dependency-decision
-- [ ] Root `package.json` and `pnpm-workspace.yaml` with `client`, `server` and `shared` (types
+- [x] Root `package.json` and `pnpm-workspace.yaml` with `client`, `server` and `shared` (types
       used by both)
-- [ ] `tsconfig.base.json` (strict), extended by each package as it is created (`server/` in
+- [x] `tsconfig.base.json` (strict), extended by each package as it is created (`server/` in
       Part 3, `client/` and `shared/` in Part 4)
-- [ ] ESLint (flat config, typescript-eslint) and Prettier at the root
-- [ ] Root scripts: `lint`, `format`, `test`, `build`, `dev`
-- [ ] `.env.example` with `OPENROUTER_API_KEY`, `GITHUB_TOKEN`
-- [ ] GitHub Actions workflow: install, lint, test on push and pull request
-- [ ] Minimal README: what it is, how to run, how to test
+- [x] ESLint (flat config, typescript-eslint) and Prettier at the root
+- [x] Root scripts: `lint`, `format`, `test`, `build`, `dev`
+- [x] `.env.example` with `OPENROUTER_API_KEY`, `GITHUB_TOKEN`
+- [x] GitHub Actions workflow: install, lint, test on push and pull request
+- [x] Minimal README: what it is, how to run, how to test
 
 Tests: none yet beyond tooling.
 
