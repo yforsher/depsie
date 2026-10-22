@@ -37,10 +37,10 @@ Success criteria: `pnpm install` and `pnpm lint` succeed on a clean clone; CI wo
 
 ## Part 3: Express backend
 
-- [ ] `server/` package: Express, TypeScript, `tsx` for dev, Vitest, Supertest
-- [ ] `createApp()` separated from `listen()` so tests need no port
-- [ ] `GET /api/health` returns `{ status: "ok" }`
-- [ ] Load env from `.env`; port from `PORT` with a default
+- [x] `server/` package: Express, TypeScript, `tsx` for dev, Vitest, Supertest
+- [x] `createApp()` separated from `listen()` so tests need no port
+- [x] `GET /api/health` returns `{ status: "ok" }`
+- [x] Load env from `.env`; port from `PORT` with a default
 
 Tests: Supertest hits `/api/health` and gets 200 with the expected body.
 

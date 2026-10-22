@@ -50,3 +50,11 @@ failing the request.
 - Version-specific npm metadata and README are cached in SQLite by package name and version.
 - Security and activity data are fetched on every request and not cached.
 - User input and reports are never stored or cached.
+
+## Code structure
+
+- `src/app.ts`: `createApp()` builds the Express app without listening, so tests need no port.
+- `src/index.ts`: entry point; listens on `PORT` (default 3000).
+- `.env` is loaded from the repo root with Node's `--env-file-if-exists` flag (see `package.json`
+  scripts); it is optional.
+- Tests sit next to the code as `*.test.ts` and use Supertest against `createApp()`.
