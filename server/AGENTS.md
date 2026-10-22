@@ -54,7 +54,9 @@ failing the request.
 ## Code structure
 
 - `src/app.ts`: `createApp()` builds the Express app without listening, so tests need no port.
-- `src/index.ts`: entry point; listens on `PORT` (default 3000).
+  It takes the client build directory and serves it with SPA fallback; unknown `/api/` paths
+  return 404.
+- `src/index.ts`: entry point; listens on `PORT` (default 3000) and serves `client/dist`.
 - `.env` is loaded from the repo root with Node's `--env-file-if-exists` flag (see `package.json`
   scripts); it is optional.
 - Tests sit next to the code as `*.test.ts` and use Supertest against `createApp()`.

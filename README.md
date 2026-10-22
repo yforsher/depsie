@@ -13,6 +13,13 @@ cp .env.example .env   # then fill in the keys
 pnpm dev
 ```
 
+To run the built app, as in production:
+
+```sh
+pnpm build
+pnpm --filter server start   # http://localhost:3000
+```
+
 ## Test
 
 ```sh

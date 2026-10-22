@@ -68,4 +68,17 @@ label or icon, never color alone.
 
 ## Code structure
 
-To be filled in when the client is built (Part 4 of `docs/plan.md`).
+- `src/main.tsx`: entry point with the TanStack Query provider.
+- `src/App.tsx`: runs the report request as a mutation and shows the form, errors and report.
+- `src/api.ts`: `fetchReport()`, the only function that talks to the server. Returns
+  `src/mockReport.ts` until Part 9.
+- `src/packageJson.ts`: parsing and privacy filtering (scope allowlist, non-registry ranges).
+  `src/allowlist.json` holds the allowed scopes.
+- `src/components/RequestForm.tsx`: need, framework, optional package.json, extra scopes,
+  validation (need at most 500 characters, at most 200 dependencies).
+- `src/components/SentPreview.tsx`: the "what is sent" preview, including entries not sent.
+- `src/components/ReportView.tsx`: ranking, alternatives, security table, data sources.
+- `src/index.css`: color tokens and all styles.
+- Tests sit next to the code as `*.test.ts(x)`; `src/test-setup.ts` registers jest-dom and
+  cleanup.
+- Request and report types come from the `shared` workspace package.

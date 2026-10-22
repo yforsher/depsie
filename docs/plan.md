@@ -48,23 +48,23 @@ Success criteria: `pnpm --filter server dev` serves the health endpoint; `pnpm t
 
 ## Part 4: Frontend with mock data
 
-- [ ] `client/` from the Vite React + TypeScript template; TanStack Query, Vitest, React Testing Library
-- [ ] Color tokens from AGENTS.md in a global CSS file; dark theme only
-- [ ] Request and report types in `shared/`, used later by the server too
-- [ ] Mock API module returning a fixed report, behind the same function the real API will use
-- [ ] Need input + framework select form
-- [ ] Optional package.json paste or upload, parsed in the browser with no network calls
-- [ ] Move the existing root `allowlist.json` into `client/src/` so it is bundled into the client
-- [ ] Scope filtering: scoped packages are kept only if their scope is in `allowlist.json`; a
+- [x] `client/` from the Vite React + TypeScript template; TanStack Query, Vitest, React Testing Library
+- [x] Color tokens from AGENTS.md in a global CSS file; dark theme only
+- [x] Request and report types in `shared/`, used later by the server too
+- [x] Mock API module returning a fixed report, behind the same function the real API will use
+- [x] Need input + framework select form
+- [x] Optional package.json paste or upload, parsed in the browser with no network calls
+- [x] Move the existing root `allowlist.json` into `client/src/` so it is bundled into the client
+- [x] Scope filtering: scoped packages are kept only if their scope is in `allowlist.json`; a
       settings field extends the allowlist
-- [ ] Non-registry filtering: drop any entry whose declared range is not a semver range or dist-tag
+- [x] Non-registry filtering: drop any entry whose declared range is not a semver range or dist-tag
       (`git+ssh:`, `git:`, `github:`, `file:`, `link:`, `workspace:`, URLs)
-- [ ] "What is sent" preview: need, framework, and filtered public dependency names and declared
+- [x] "What is sent" preview: need, framework, and filtered public dependency names and declared
       version ranges; separately lists every entry not sent and why (scope not allowed, non-registry);
       explains that the package.json itself is never sent
-- [ ] Report view: ranking, reasons, rejected alternatives, security and compliance, data sources and fetch date
-- [ ] Express serves the built client (`client/dist`) as static files, with SPA fallback
-- [ ] Fill in the "Code structure" section of `client/AGENTS.md`
+- [x] Report view: ranking, reasons, rejected alternatives, security and compliance, data sources and fetch date
+- [x] Express serves the built client (`client/dist`) as static files, with SPA fallback
+- [x] Fill in the "Code structure" section of `client/AGENTS.md`
 
 Tests:
 
