@@ -48,7 +48,7 @@ No chat and no follow-up turns: each request makes a fixed, small number of AI c
 | Cache       | SQLite, package metadata and README by name and version                    |
 | Tests       | Vitest, React Testing Library, Supertest                                   |
 | Repo and CI | pnpm workspaces monorepo (`client/`, `server/`, `shared/`), GitHub Actions |
-| Hosting     | Free tier hosting for client and server, to be decided                     |
+| Hosting     | One free tier host; the server serves the built client. Provider TBD       |
 
 - `client/`: form, local package.json filtering, preview, report view, export. See `client/AGENTS.md`.
 - `server/`: single `POST /api/report` endpoint, data fetching, caching, AI calls. See `server/AGENTS.md`.
