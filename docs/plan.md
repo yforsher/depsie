@@ -104,13 +104,19 @@ at most 5 name@version candidates.
 
 ## Part 6: Fetch package data
 
-- [ ] Verify the remaining endpoints (npm downloads, deps.dev, OSV, GitHub) by calling each once
+- [x] Verify the remaining endpoints (npm downloads, deps.dev, OSV, GitHub) by calling each once
       by hand and adding the response shape to `docs/endpoints.md`
-- [ ] Fetch version-specific package metadata and README from npm, and security findings and activity data from deps.dev, OSV, npm downloads, and GitHub, on every request
-- [ ] Merge into one `PackageData` type, with source and fetch date per field
-- [ ] A failed source (GitHub rate limit, no repository, timeout) marks its fields as unavailable
+- [x] Fetch version-specific package metadata and README from npm, and security findings and activity data from deps.dev, OSV, npm downloads, and GitHub, on every request
+- [x] Stars, open issues and Scorecard from deps.dev; one GitHub call per package for the last
+      push and the archived flag (decided with the user)
+- [x] When npm's metadata has no README, fall back to the published `README.md` on jsDelivr
+      (decided with the user; npm has none for `cron@4.4.0` although the package ships one)
+- [x] Merge into one `PackageData` type, with source and fetch date per field (one group per
+      source: every field in a group shares its source, URL and fetch date)
+- [x] A failed source (GitHub rate limit, no repository, timeout) marks its fields as unavailable
       instead of failing the request; the report shows them as unavailable
-- [ ] GitHub token from `.env`
+- [x] GitHub token from `.env` (a fine-grained token with public repository read access; limit
+      checked at 5,000 requests per hour)
 
 Tests: each fetcher against recorded fixtures; merge logic; a failed source yields unavailable
 fields.

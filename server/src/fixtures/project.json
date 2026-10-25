@@ -1,0 +1,46 @@
+{
+  "projectKey": {
+    "id": "github.com/react-hook-form/resolvers"
+  },
+  "openIssuesCount": 0,
+  "starsCount": 2263,
+  "forksCount": 214,
+  "license": "MIT",
+  "description": "📋 Validation resolvers: Yup, Zod, Superstruct, Joi, Vest, Class Validator, io-ts, Nope, computed-types, typanion, Ajv, TypeBox, ArkType, Valibot, effect-ts, VineJS and Standard Schema",
+  "homepage": "https://react-hook-form.com/docs/useform#resolver",
+  "scorecard": {
+    "date": "2026-08-24T00:00:00Z",
+    "repository": {
+      "name": "github.com/react-hook-form/resolvers",
+      "commit": "f18ddfbb5f75a24b77c408565ad767eba4dd6704"
+    },
+    "scorecard": {
+      "version": "v5.5.1-0.20260815060127-d1fab88f5463",
+      "commit": "d1fab88f54636ff366076edfc5c239f97b3c8e66"
+    },
+    "checks": [
+      {
+        "name": "Dangerous-Workflow",
+        "documentation": {
+          "shortDescription": "Determines if the project's GitHub Action workflows avoid dangerous patterns.",
+          "url": "https://github.com/ossf/scorecard/blob/d1fab88f54636ff366076edfc5c239f97b3c8e66/docs/checks.md#dangerous-workflow"
+        },
+        "score": 10,
+        "reason": "no dangerous workflow patterns detected",
+        "details": []
+      },
+      {
+        "name": "Packaging",
+        "documentation": {
+          "shortDescription": "Determines if the project is published as a package that others can easily download, install, easily update, and uninstall.",
+          "url": "https://github.com/ossf/scorecard/blob/d1fab88f54636ff366076edfc5c239f97b3c8e66/docs/checks.md#packaging"
+        },
+        "score": -1,
+        "reason": "packaging workflow not detected",
+        "details": ["Warn: no GitHub/GitLab publishing workflow detected."]
+      }
+    ],
+    "overallScore": 5.3,
+    "metadata": []
+  }
+}

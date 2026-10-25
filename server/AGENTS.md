@@ -31,16 +31,18 @@ output with any other reference is rejected.
 
 ## Data sources
 
-Endpoints were written from memory and must be verified before use (Parts 5 and 6 of `docs/plan.md`).
+Every endpoint was verified by hand; response shapes and a real traced run are in
+`docs/endpoints.md`.
 
-| Source                                                 | Used for                                                                                    |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| npm registry search (`registry.npmjs.org/-/v1/search`) | Finding candidates by keyword                                                               |
-| npm registry package metadata                          | Versions, release dates, license, maintainers, dependencies, peer dependencies, types, size |
-| npm downloads API (`api.npmjs.org/downloads`)          | Weekly downloads                                                                            |
-| deps.dev API (Google Open Source Insights)             | Licenses, advisories, dependency graph, OpenSSF Scorecard                                   |
-| OSV.dev API                                            | Known vulnerabilities per version                                                           |
-| GitHub REST API (token needed for higher rate limits)  | Stars, open issues, last commit                                                             |
+| Source                                                 | Used for                                                                                            |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| npm registry search (`registry.npmjs.org/-/v1/search`) | Finding candidates by keyword                                                                       |
+| npm registry package metadata                          | Versions, release dates, license, maintainers, dependencies, peer dependencies, types, size, README |
+| npm downloads API (`api.npmjs.org/downloads`)          | Weekly downloads                                                                                    |
+| jsDelivr (`cdn.jsdelivr.net/npm`)                      | README.md from the published files, when npm's metadata has none                                    |
+| deps.dev API (Google Open Source Insights)             | Total dependency count, stars, open issues, OpenSSF Scorecard                                       |
+| OSV.dev API                                            | Known vulnerabilities per version                                                                   |
+| GitHub REST API (token needed for higher rate limits)  | Last push and archived flag (one call per package)                                                  |
 
 A failed source (for example a GitHub rate limit) marks its fields as unavailable instead of
 failing the request.
@@ -60,6 +62,13 @@ failing the request.
   Zod schema as JSON Schema and validates the answer with it. Failures throw `AiError`.
 - `src/candidates.ts`: `findCandidates()`, AI call 1. Model-named packages are resolved to their
   latest version (unknown names dropped), npm search results fill the rest, at most 5 returned.
+- `src/sources.ts`: one fetcher per outside source, each with a 10 second timeout. Fetchers
+  throw on any failure.
+- `src/packageData.ts`: `fetchPackageData()` runs the fetchers for one candidate and merges the
+  results into `PackageData`: one group per source with `source`, `url`, `fetchedAt` and either
+  `data` or `unavailable` (the reason). A failed source never fails the request.
+- `src/fixtures/`: trimmed real responses used by the fetcher tests; `src/fixtures.ts` serves
+  them through a mocked `fetch` (excluded from the build).
 - The request schema (`reportRequestSchema`) lives in `shared/` and is used by both client and
   server.
 - `.env` is loaded from the repo root with Node's `--env-file-if-exists` flag (see `package.json`

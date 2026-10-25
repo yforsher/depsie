@@ -74,6 +74,98 @@ Response:
 A test call with a two-field schema returned valid JSON matching the schema: 83 prompt tokens,
 374 completion tokens (203 of them reasoning), cost $0.00006.
 
+## npm downloads
+
+`GET https://api.npmjs.org/downloads/point/last-week/<name>` (scoped names work unencoded)
+
+```json
+{ "downloads": 33876365, "start": "2026-10-16", "end": "2026-10-22", "package": "react-hook-form" }
+```
+
+## deps.dev version
+
+`GET https://api.deps.dev/v3/systems/npm/packages/<name>/versions/<version>` (scoped names must be
+encoded: `%40hookform%2Fresolvers`)
+
+```
+{
+  versionKey: { system: "NPM", name, version },
+  publishedAt, isDefault, isDeprecated, deprecatedReason,
+  licenses: ["MIT"],
+  advisoryKeys: [{ id }],            // empty when there are no known advisories
+  links: [{ label, url }],           // HOMEPAGE, ISSUE_TRACKER, ORIGIN, SOURCE_REPO
+  relatedProjects: [{ projectKey: { id: "github.com/<owner>/<repo>" }, relationType }]
+}
+```
+
+`GET .../versions/<version>:dependencies` returns the resolved dependency graph:
+`{ nodes: [{ versionKey, relation: "SELF" | "DIRECT" | "INDIRECT" }], edges: [{ fromNode, toNode, requirement }] }`.
+For `formik@2.4.9`: 10 nodes, so 9 dependencies in total.
+
+## deps.dev project
+
+`GET https://api.deps.dev/v3/projects/github.com%2F<owner>%2F<repo>` (project ID from
+`relatedProjects`, encoded)
+
+```
+{
+  projectKey: { id }, starsCount, forksCount, openIssuesCount, license, description, homepage,
+  scorecard: {
+    date,                            // "2026-08-24T00:00:00Z": scorecards can be months old
+    overallScore,                    // 5.8 for react-hook-form
+    checks: [{ name, score, reason, documentation: { shortDescription, url } }]
+  }
+}
+```
+
+Check scores run 0 to 10, or -1 when the check could not run. Checks include `Maintained`,
+`Code-Review`, `Security-Policy`, `License`, `Dangerous-Workflow` and `Signed-Releases`.
+
+## OSV
+
+`POST https://api.osv.dev/v1/query` with `{ "package": { "name", "ecosystem": "npm" }, "version" }`
+
+No known vulnerabilities: `{}` (no `vulns` key). Otherwise:
+
+```
+{
+  vulns: [{
+    id,                              // "GHSA-29mw-wpgm-hmr9"
+    summary, details, aliases,       // aliases: ["CVE-2020-28500"]
+    published, modified,
+    severity: [{ type: "CVSS_V3", score: "CVSS:3.1/AV:N/..." }],
+    database_specific: { severity: "MODERATE" | "HIGH" | ..., cwe_ids },
+    affected, references
+  }]
+}
+```
+
+`lodash@4.17.20` returned 5 vulnerabilities (2 HIGH, 3 MODERATE).
+
+## GitHub
+
+`GET https://api.github.com/repos/<owner>/<repo>`
+
+```
+{ full_name, stargazers_count, open_issues_count, pushed_at, updated_at, archived, disabled,
+  license: { spdx_id }, default_branch }
+```
+
+`open_issues_count` includes open pull requests (8 here, where deps.dev reported 7 issues).
+
+`GET https://api.github.com/repos/<owner>/<repo>/commits?per_page=1` returns the latest commit on
+the default branch: `[{ sha, commit: { author: { date }, committer: { date } } }]`.
+
+Without a token the limit is 60 requests per hour per IP (`X-RateLimit-Limit: 60`,
+`X-RateLimit-Remaining` in the response headers).
+
+## jsDelivr
+
+`GET https://cdn.jsdelivr.net/npm/<name>@<version>/README.md` returns the README.md from the
+published package files as plain text. Used only when npm's metadata has no README: for
+`cron@4.4.0`, npm's `readme` is `""` with no `readmeFilename`, while the package ships a 13 KB
+README.md. A package without that file returns 404.
+
 ## Example: one `findCandidates()` run
 
 Real traffic from one run on 2026-10-25, trimmed to the fields that matter. The request was:

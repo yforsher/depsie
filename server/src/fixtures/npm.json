@@ -1,0 +1,119 @@
+{
+  "name": "@hookform/resolvers",
+  "description": "React Hook Form validation resolvers: Yup, Joi, Superstruct, Zod, Vest, Class Validator, io-ts, Nope, computed-types, TypeBox, arktype, Typanion, Effect-TS and VineJS",
+  "maintainers": [
+    {
+      "name": "bluebill1049"
+    },
+    {
+      "name": "kotarella1110"
+    },
+    {
+      "name": "jorisre"
+    }
+  ],
+  "repository": {
+    "url": "git+https://github.com/react-hook-form/resolvers.git",
+    "type": "git"
+  },
+  "readme": "<div align=\"center\">\n    <p align=\"center\">\n        <a href=\"https://react-hook-form.com\" title=\"React Hook Form - Simple React forms validation\">\n            <img src=\"https://raw.githubusercontent.com/bluebill1049/react-hook-form/master/docs/logo.png\" alt=\"React Hook Form Logo - React hook custom ",
+  "time": {
+    "created": "2020-05-20T11:33:35.328Z",
+    "modified": "2026-10-19T05:35:47.453Z",
+    "5.9.1": "2026-08-17T07:36:58.064Z",
+    "5.9.2": "2026-10-17T08:30:34.845Z",
+    "6.0.0": "2026-10-19T05:35:47.214Z"
+  },
+  "versions": {
+    "5.9.1": {
+      "version": "5.9.1",
+      "license": "MIT",
+      "dependencies": {
+        "@standard-schema/utils": "^0.3.0"
+      },
+      "peerDependencies": {
+        "ajv": "^8.12.0",
+        "joi": "^17.0.0 || ^18.0.0",
+        "yup": "^1.0.0",
+        "zod": "^3.25.0 || ^4.0.0",
+        "vest": ">=6.0.0",
+        "fp-ts": "^2.7.0",
+        "io-ts": "^2.0.0",
+        "effect": "^3.10.3",
+        "arktype": "^2.0.0",
+        "valibot": ">=0.31.0 || ^1.0.0-beta.4 || ^1.0.0-rc",
+        "typanion": "^3.3.2",
+        "ajv-errors": "^3.0.0",
+        "ajv-formats": "^2.1.1",
+        "superstruct": ">=0.12.0",
+        "@vinejs/vine": "^2.0.0 || ^3.0.0 || ^4.0.0",
+        "ata-validator": "^1.2.0",
+        "computed-types": "^1.0.0",
+        "nope-validator": ">=0.12.0",
+        "class-validator": ">=0.12.0",
+        "react-hook-form": "^7.55.0",
+        "@typeschema/main": ">=0.13.7",
+        "@sinclair/typebox": ">=0.25.24",
+        "class-transformer": ">=0.4.0",
+        "fluentvalidation-ts": "^3.0.0",
+        "@standard-schema/spec": "^1.0.0"
+      },
+      "types": "dist/index.d.ts",
+      "dist": {
+        "unpackedSize": 1164823
+      }
+    },
+    "5.9.2": {
+      "version": "5.9.2",
+      "license": "MIT",
+      "dependencies": {
+        "@standard-schema/utils": "^0.3.0"
+      },
+      "peerDependencies": {
+        "ajv": "^8.12.0",
+        "joi": "^17.0.0 || ^18.0.0",
+        "yup": "^1.0.0",
+        "zod": "^3.25.0 || ^4.0.0",
+        "vest": ">=6.0.0",
+        "fp-ts": "^2.7.0",
+        "io-ts": "^2.0.0",
+        "effect": "^3.10.3",
+        "arktype": "^2.0.0",
+        "valibot": ">=0.31.0 || ^1.0.0-beta.4 || ^1.0.0-rc",
+        "typanion": "^3.3.2",
+        "ajv-errors": "^3.0.0",
+        "ajv-formats": "^2.1.1",
+        "superstruct": ">=0.12.0",
+        "@vinejs/vine": "^2.0.0 || ^3.0.0 || ^4.0.0",
+        "ata-validator": "^1.23.0",
+        "computed-types": "^1.0.0",
+        "nope-validator": ">=0.12.0",
+        "class-validator": ">=0.12.0",
+        "react-hook-form": "^7.55.0",
+        "@typeschema/main": ">=0.13.7",
+        "@sinclair/typebox": ">=0.25.24",
+        "class-transformer": ">=0.4.0",
+        "fluentvalidation-ts": "^3.0.0",
+        "@standard-schema/spec": "^1.0.0"
+      },
+      "types": "dist/index.d.ts",
+      "dist": {
+        "unpackedSize": 1168033
+      }
+    },
+    "6.0.0": {
+      "version": "6.0.0",
+      "license": "MIT",
+      "dependencies": {
+        "@standard-schema/utils": "^0.3.0"
+      },
+      "peerDependencies": {
+        "react-hook-form": "^7.55.0"
+      },
+      "types": "dist/index.d.ts",
+      "dist": {
+        "unpackedSize": 1179806
+      }
+    }
+  }
+}
