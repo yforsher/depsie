@@ -56,6 +56,13 @@ failing the request.
   It takes the client build directory and serves it with SPA fallback; unknown `/api/` paths
   return 404.
 - `src/index.ts`: entry point; listens on `PORT` (default 3000) and serves `client/dist`.
+- `src/openrouter.ts`: `MODEL` (the one place the model ID is set) and `chatJson()`, which sends a
+  Zod schema as JSON Schema and validates the answer with it. Failures throw `AiError`.
+- `src/candidates.ts`: `findCandidates()`, AI call 1. Model-named packages are resolved to their
+  latest version (unknown names dropped), npm search results fill the rest, at most 5 returned.
+- The request schema (`reportRequestSchema`) lives in `shared/` and is used by both client and
+  server.
 - `.env` is loaded from the repo root with Node's `--env-file-if-exists` flag (see `package.json`
   scripts); it is optional.
-- Tests sit next to the code as `*.test.ts` and use Supertest against `createApp()`.
+- Tests sit next to the code as `*.test.ts`. Endpoint tests use Supertest against `createApp()`;
+  outside calls are mocked by stubbing `fetch`.

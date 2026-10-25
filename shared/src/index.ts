@@ -1,16 +1,22 @@
+import * as z from 'zod';
+
 export const frameworks = ['React', 'Vue', 'Angular', 'Svelte', 'Node.js', 'None'] as const;
 export type Framework = (typeof frameworks)[number];
 
-export interface Dependency {
-  name: string;
-  range: string;
-}
+// Size limits keep the AI prompt, and so the cost per request, bounded.
+// 214 is npm's own maximum package name length.
+export const dependencySchema = z.object({
+  name: z.string().min(1).max(214),
+  range: z.string().min(1).max(100),
+});
+export type Dependency = z.infer<typeof dependencySchema>;
 
-export interface ReportRequest {
-  need: string;
-  framework: Framework;
-  dependencies?: Dependency[];
-}
+export const reportRequestSchema = z.object({
+  need: z.string().trim().min(1).max(500),
+  framework: z.enum(frameworks),
+  dependencies: z.array(dependencySchema).max(200).optional(),
+});
+export type ReportRequest = z.infer<typeof reportRequestSchema>;
 
 /** Points at one fetched data field; the server checks it exists for the report. */
 export interface EvidenceRef {

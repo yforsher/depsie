@@ -80,20 +80,20 @@ all tests pass; status colors always have a text label.
 
 ## Part 5: AI call 1, query expansion
 
-- [ ] Verify the endpoints used in this part (npm search, npm package metadata, OpenRouter; see
+- [x] Verify the endpoints used in this part (npm search, npm package metadata, OpenRouter; see
       `server/AGENTS.md`) by calling each once by hand and recording the response shape in
       `docs/endpoints.md`
-- [ ] Model: `openai/gpt-oss-120b` for both AI calls (chosen for cost). Route only to providers
+- [x] Model: `openai/gpt-oss-120b` for both AI calls (chosen for cost). Route only to providers
       that support structured output (`provider.require_parameters: true`) and confirm with a real
       call. Keep the model ID in one place so it can be swapped later
-- [ ] OpenRouter client using structured JSON output; validate the response with Zod
-- [ ] Zod schema for the request `{ need, framework, dependencies? }` in `shared/`, replacing the
+- [x] OpenRouter client using structured JSON output; validate the response with Zod
+- [x] Zod schema for the request `{ need, framework, dependencies? }` in `shared/`, replacing the
       `ReportRequest` interface with a type inferred from the schema; dependencies contain package
       names and declared version ranges; size limits keep costs predictable (need at most 500
       characters, at most 200 dependency entries)
-- [ ] Internal `findCandidates()` function (no endpoint): prompt uses need, framework, and optional dependency entries as context; returns search keywords and candidate package names
-- [ ] Combine with npm registry search results; resolve latest versions from the registry
-- [ ] Return at most 5 candidates, since each one adds data fetches and tokens to AI call 2
+- [x] Internal `findCandidates()` function (no endpoint): prompt uses need, framework, and optional dependency entries as context; returns search keywords and candidate package names
+- [x] Combine with npm registry search results; resolve latest versions from the registry
+- [x] Return at most 5 candidates, since each one adds data fetches and tokens to AI call 2
 
 Tests: OpenRouter mocked; valid response parsed; invalid model output rejected with a clear error;
 invalid request rejected by the Zod schema, including oversized input; no more than 5 candidates
