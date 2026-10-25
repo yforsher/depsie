@@ -44,7 +44,7 @@ No chat and no follow-up turns: each request makes a fixed, small number of AI c
 | ----------- | -------------------------------------------------------------------------- |
 | Client      | React, TypeScript, Vite, TanStack Query                                    |
 | Server      | Node, Express, TypeScript, Zod                                             |
-| AI          | OpenRouter API (model to be chosen) with structured JSON output            |
+| AI          | OpenRouter API (`openai/gpt-oss-120b`) with structured JSON output         |
 | Tests       | Vitest, React Testing Library, Supertest                                   |
 | Repo and CI | pnpm workspaces monorepo (`client/`, `server/`, `shared/`), GitHub Actions |
 | Hosting     | One free tier host; the server serves the built client. Provider TBD       |

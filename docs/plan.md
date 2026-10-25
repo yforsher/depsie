@@ -80,24 +80,32 @@ all tests pass; status colors always have a text label.
 
 ## Part 5: AI call 1, query expansion
 
-- [ ] Verify every endpoint in AGENTS.md (npm search, metadata, downloads, deps.dev, OSV, GitHub,
-      OpenRouter) by calling it once by hand and recording the response shape in `docs/endpoints.md`
-- [ ] Choose the OpenRouter model with the user; confirm it supports structured JSON output
+- [ ] Verify the endpoints used in this part (npm search, npm package metadata, OpenRouter; see
+      `server/AGENTS.md`) by calling each once by hand and recording the response shape in
+      `docs/endpoints.md`
+- [ ] Model: `openai/gpt-oss-120b` for both AI calls (chosen for cost). Route only to providers
+      that support structured output (`provider.require_parameters: true`) and confirm with a real
+      call. Keep the model ID in one place so it can be swapped later
 - [ ] OpenRouter client using structured JSON output; validate the response with Zod
-- [ ] Zod schema for the request `{ need, framework, dependencies? }`, where dependencies contain
-      package names and declared version ranges; size limits keep costs predictable (need at most
-      500 characters, at most 200 dependency entries)
+- [ ] Zod schema for the request `{ need, framework, dependencies? }` in `shared/`, replacing the
+      `ReportRequest` interface with a type inferred from the schema; dependencies contain package
+      names and declared version ranges; size limits keep costs predictable (need at most 500
+      characters, at most 200 dependency entries)
 - [ ] Internal `findCandidates()` function (no endpoint): prompt uses need, framework, and optional dependency entries as context; returns search keywords and candidate package names
 - [ ] Combine with npm registry search results; resolve latest versions from the registry
+- [ ] Return at most 5 candidates, since each one adds data fetches and tokens to AI call 2
 
 Tests: OpenRouter mocked; valid response parsed; invalid model output rejected with a clear error;
-invalid request rejected by the Zod schema, including oversized input.
+invalid request rejected by the Zod schema, including oversized input; no more than 5 candidates
+returned.
 
 Success criteria: a real call to `findCandidates()` with a sample need returns a sensible list of
-name@version candidates.
+at most 5 name@version candidates.
 
 ## Part 6: Fetch package data
 
+- [ ] Verify the remaining endpoints (npm downloads, deps.dev, OSV, GitHub) by calling each once
+      by hand and adding the response shape to `docs/endpoints.md`
 - [ ] Fetch version-specific package metadata and README from npm, and security findings and activity data from deps.dev, OSV, npm downloads, and GitHub, on every request
 - [ ] Merge into one `PackageData` type, with source and fetch date per field
 - [ ] A failed source (GitHub rate limit, no repository, timeout) marks its fields as unavailable
@@ -157,3 +165,6 @@ Success criteria: the downloaded file reads correctly and matches the on-screen 
 - Package data cache: dropped for now, since resolving the latest version already fetches the
   metadata and README, AI calls dominate cost and latency, and free hosts often wipe the disk.
   Revisit with an in-memory cache only if npm latency or limits become a problem.
+- Model upgrade: start with `openai/gpt-oss-120b`. If reports are often rejected or their wording
+  strays from the cited facts, compare against a more capable model (for example Claude Sonnet 5.5
+  or GPT-6.1 Sol) on the same sample needs.

@@ -16,9 +16,9 @@ never in the repo) and talks to outside services.
 
 ## AI usage
 
-OpenRouter with structured JSON output, validated with Zod. Model to be decided. At most two AI
-calls per request and no retries: invalid model output or an OpenRouter error returns 502 with a
-clear message.
+OpenRouter with structured JSON output, validated with Zod. Model: `openai/gpt-oss-120b`. At most
+two AI calls per request and no retries: invalid model output or an OpenRouter error returns 502
+with a clear message.
 
 1. Query expansion: turn the need and framework into npm search keywords and candidate names. When
    provided, include the filtered public dependency names and declared version ranges as context.
@@ -31,7 +31,7 @@ output with any other reference is rejected.
 
 ## Data sources
 
-Endpoints were written from memory and must be verified before use (Part 5 of `docs/plan.md`).
+Endpoints were written from memory and must be verified before use (Parts 5 and 6 of `docs/plan.md`).
 
 | Source                                                 | Used for                                                                                    |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
