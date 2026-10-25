@@ -31,7 +31,7 @@ output with any other reference is rejected.
 
 ## Data sources
 
-Endpoints were written from memory and must be verified before use (Part 6 of `docs/plan.md`).
+Endpoints were written from memory and must be verified before use (Part 5 of `docs/plan.md`).
 
 | Source                                                 | Used for                                                                                    |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
@@ -45,11 +45,10 @@ Endpoints were written from memory and must be verified before use (Part 6 of `d
 A failed source (for example a GitHub rate limit) marks its fields as unavailable instead of
 failing the request.
 
-## Caching and storage
+## Storage
 
-- Version-specific npm metadata and README are cached in SQLite by package name and version.
-- Security and activity data are fetched on every request and not cached.
-- User input and reports are never stored or cached.
+- All package data is fetched on every request; nothing is cached.
+- User input and reports are never stored.
 
 ## Code structure
 

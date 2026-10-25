@@ -71,7 +71,7 @@ label or icon, never color alone.
 - `src/main.tsx`: entry point with the TanStack Query provider.
 - `src/App.tsx`: runs the report request as a mutation and shows the form, errors and report.
 - `src/api.ts`: `fetchReport()`, the only function that talks to the server. Returns
-  `src/mockReport.ts` until Part 9.
+  `src/mockReport.ts` until Part 8.
 - `src/packageJson.ts`: parsing and privacy filtering (scope allowlist, non-registry ranges).
   `src/allowlist.json` holds the allowed scopes.
 - `src/components/RequestForm.tsx`: need, framework, optional package.json, extra scopes,

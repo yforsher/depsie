@@ -19,7 +19,7 @@ Planning details moved out of AGENTS.md. Read when working on project setup, mil
 Each ends with something working and deployed.
 
 1. Skeleton: monorepo with client and server, a single endpoint returning data for one package, deployed with a public URL, CI running lint and tests.
-2. Package data: server fetches and merges npm, downloads, deps.dev and OSV data for a package, with caching. Client shows a package card.
+2. Package data: server fetches and merges npm, downloads, deps.dev and OSV data for a package. Client shows a package card.
 3. Search and compare: need + framework produces a shortlist; comparison table with live filters.
 4. Project fit: paste or drop package.json, in-browser parsing, preview of what is sent, scoped package filter, fit checks.
 5. AI layer: query expansion, grounded ranking with structured output, side-by-side code examples.

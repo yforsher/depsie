@@ -18,7 +18,7 @@ Success criteria: the user approves this document.
 ## Part 2: Scaffolding
 
 - [x] `git init`
-- [x] `.gitignore` (node_modules, dist, .env, \*.sqlite)
+- [x] `.gitignore` (node_modules, dist, .env)
 - [x] Project name: `dependency-decision`
 - [x] Public GitHub repo: https://github.com/yforsher/dependency-decision
 - [x] Root `package.json` and `pnpm-workspace.yaml` with `client`, `server` and `shared` (types
@@ -78,21 +78,7 @@ Tests:
 Success criteria: `pnpm build` then starting the server shows the full app working on mock data;
 all tests pass; status colors always have a text label.
 
-## Part 5: Database modeling
-
-- [ ] Propose a SQLite schema for the cache and get user approval before coding:
-  - `package_version` (name, version, version-specific npm metadata and README, fetched_at): cached by name and version
-  - Security findings and activity data (downloads, stars, issues, and recent commits) are fetched on every request and are not cached
-  - Reports are generated per request and are not stored or cached
-- [ ] Implement with `better-sqlite3` (or `node:sqlite` if stable in the Node version used)
-- [ ] Small package cache module: `get`, `set` by package name and version
-
-Tests: package name/version set/get roundtrip; a miss returns nothing; different versions of the
-same package are stored separately.
-
-Success criteria: user approves the schema; cache tests pass using an in-memory database.
-
-## Part 6: AI call 1, query expansion
+## Part 5: AI call 1, query expansion
 
 - [ ] Verify every endpoint in AGENTS.md (npm search, metadata, downloads, deps.dev, OSV, GitHub,
       OpenRouter) by calling it once by hand and recording the response shape in `docs/endpoints.md`
@@ -110,22 +96,20 @@ invalid request rejected by the Zod schema, including oversized input.
 Success criteria: a real call to `findCandidates()` with a sample need returns a sensible list of
 name@version candidates.
 
-## Part 7: Fetch package data
+## Part 6: Fetch package data
 
-- [ ] Fetch version-specific package metadata and README from npm; fetch security findings and activity data from deps.dev, OSV, npm downloads, and GitHub on every request without caching them
+- [ ] Fetch version-specific package metadata and README from npm, and security findings and activity data from deps.dev, OSV, npm downloads, and GitHub, on every request
 - [ ] Merge into one `PackageData` type, with source and fetch date per field
 - [ ] A failed source (GitHub rate limit, no repository, timeout) marks its fields as unavailable
       instead of failing the request; the report shows them as unavailable
-- [ ] Read package metadata and README through the name/version cache from Part 5; fetch security findings and activity data on each request without caching
 - [ ] GitHub token from `.env`
 
 Tests: each fetcher against recorded fixtures; merge logic; a failed source yields unavailable
-fields; cached package metadata and README skip their npm fetches; security and activity fetchers
-run on each request.
+fields.
 
-Success criteria: data for a few real packages is fetched and merged; package metadata and README are cached by name/version, while security and activity data are fetched again on each request and are not cached.
+Success criteria: data for a few real packages is fetched and merged.
 
-## Part 8: AI call 2, comparison report
+## Part 7: AI call 2, comparison report
 
 - [ ] Prompt sends only fetched data and READMEs; asks for ranking, reasons, rejected alternatives
       and why, and security and compliance per package (license, known vulnerabilities,
@@ -134,7 +118,7 @@ Success criteria: data for a few real packages is fetched and merged; package me
 - [ ] Zod schema for the structured result; each factual claim, recommendation, and ranking includes evidence references identifying package, fetched field, source, and fetch date; keep wording close to those facts and avoid unsupported interpretations
 - [ ] Validate every evidence reference against the data fetched for the report; reject output containing references to fields that were not fetched. This validates reference existence, not semantic support, so report wording must remain close to the cited facts
 - [ ] `POST /api/report`, the only report endpoint: validates `{ need, framework, dependencies? }`
-      with the Part 6 schema, then runs the whole pipeline (`findCandidates()`, fetch package data,
+      with the Part 5 schema, then runs the whole pipeline (`findCandidates()`, fetch package data,
       comparison) and returns the report. Clients cannot pass their own candidate list.
 - [ ] No AI retries, so a request never exceeds two AI calls: invalid model output or an
       OpenRouter error returns 502 with a clear message
@@ -145,9 +129,9 @@ Tests: OpenRouter mocked; schema validation; invalid request body returns 400; o
 exactly two AI calls; invalid model output returns 502 with no retry; requests over the rate limit
 return 429; each request generates a report without storing it.
 
-Success criteria: a report is generated for a sample need and returned without being stored or cached.
+Success criteria: a report is generated for a sample need and returned without being stored.
 
-## Part 9: Connect frontend to backend
+## Part 8: Connect frontend to backend
 
 - [ ] Replace the mock API with a single `POST /api/report` call via TanStack Query
 - [ ] Loading state; error states with a clear message for 400 (invalid input), 429 (rate limit)
@@ -159,7 +143,7 @@ mock-based tests still pass.
 
 Success criteria: need + framework in the browser produces a real report end to end.
 
-## Part 10: Share report as Markdown download
+## Part 9: Share report as Markdown download
 
 - [ ] Build Markdown from the structured report in code (no AI call)
 - [ ] Download button saves a `.md` file
@@ -167,3 +151,9 @@ Success criteria: need + framework in the browser produces a real report end to 
 Tests: Markdown builder snapshot; contains all report sections and the data fetch date.
 
 Success criteria: the downloaded file reads correctly and matches the on-screen report.
+
+## TBD
+
+- Package data cache: dropped for now, since resolving the latest version already fetches the
+  metadata and README, AI calls dominate cost and latency, and free hosts often wipe the disk.
+  Revisit with an in-memory cache only if npm latency or limits become a problem.

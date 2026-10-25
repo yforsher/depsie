@@ -46,8 +46,8 @@ would favor option 1, but two reasons outweigh it:
 - **Privacy claim.** The raw `package.json` is parsed only in the browser and never reaches the
   server. Separate packages make that boundary easy to verify: what the client sends and what the
   server accepts are both defined by types in `shared`.
-- **Separate dependencies.** Browser code cannot import server-only packages such as the SQLite
-  driver or API clients, and server code cannot import React.
+- **Separate dependencies.** Browser code cannot import server-only packages such as API
+  clients, and server code cannot import React.
 
 ## Why pnpm
 
