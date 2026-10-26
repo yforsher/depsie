@@ -41,15 +41,16 @@ describe('chatJson', () => {
   it('rejects output that is not JSON', async () => {
     mockOpenRouter('not json');
     await expect(chatJson('test', schema, 'system', 'user')).rejects.toThrow(
-      new AiError('Model output is not valid JSON: not json'),
+      new AiError('Model output is not valid JSON: not json', 'not json'),
     );
   });
 
   it('rejects output that does not match the schema', async () => {
     mockOpenRouter('{"packages":"zod"}');
-    await expect(chatJson('test', schema, 'system', 'user')).rejects.toThrow(
-      /does not match the schema/,
-    );
+    await expect(chatJson('test', schema, 'system', 'user')).rejects.toMatchObject({
+      message: expect.stringContaining('does not match the schema'),
+      modelOutput: '{"packages":"zod"}',
+    });
   });
 
   it('rejects an OpenRouter error response', async () => {

@@ -47,6 +47,7 @@ export function createApp(clientDir: string) {
 
 const aiErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
   if (!(error instanceof AiError)) return next(error);
-  console.error(error);
+  console.error(error.message);
+  if (error.modelOutput) console.error(`Rejected model output: ${error.modelOutput}`);
   res.status(502).json({ error: `The AI step failed: ${error.message}` });
 };

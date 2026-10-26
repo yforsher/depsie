@@ -71,9 +71,13 @@ failing the request.
   The prompt holds each package's source groups (data, or `unavailable` with the reason) with
   READMEs cut to 4,000 characters. The model cites `package` and `field` (`group.key`, for
   example `npm.license`); each reference is checked against those same fields, and source and
-  fetch date are filled in from `PackageData`. Any unknown package or field throws `AiError`.
+  fetch date are filled in from `PackageData`. Unknown packages or fields throw one `AiError`
+  listing all of them.
+- `AiError` carries the raw model output when the answer was rejected (not JSON, schema mismatch,
+  invalid references).
 - `POST /api/report` in `src/app.ts`: rate limited to 10 per hour per IP (429), Zod validation
-  (400), then `generateReport()`; `AiError` becomes 502 with the message.
+  (400), then `generateReport()`; `AiError` becomes 502 with the message, and the rejected model
+  output is logged to the console (never stored) so failures can be investigated.
 - `src/fixtures/`: trimmed real responses used by the fetcher tests; `src/fixtures.ts` serves
   them through a mocked `fetch`, plus a valid AI call 2 answer (excluded from the build).
 - The request schema (`reportRequestSchema`) lives in `shared/` and is used by both client and

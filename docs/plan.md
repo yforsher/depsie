@@ -153,10 +153,20 @@ Success criteria: a report is generated for a sample need and returned without b
 
 ## Part 8: Connect frontend to backend
 
-- [ ] Replace the mock API with a single `POST /api/report` call via TanStack Query
-- [ ] Loading state; error states with a clear message for 400 (invalid input), 429 (rate limit)
+- [x] Replace the mock API with a single `POST /api/report` call via TanStack Query
+- [x] Loading state; error states with a clear message for 400 (invalid input), 429 (rate limit)
       and 502 (AI failure)
-- [ ] Send need, framework, and only filtered public dependency names and declared version ranges from package.json, matching the preview; never send the manifest itself
+- [x] Send need, framework, and only filtered public dependency names and declared version ranges from package.json, matching the preview; never send the manifest itself
+- [x] Vite dev server proxies `/api` to the Express server on port 3000
+- [x] Browser check on the built server: "A date picker component" (React) showed the loading
+      state, then a real report with ranking, evidence, security and data sources
+- [x] Log the raw model output when a report is rejected (console only, never stored), with every
+      invalid reference listed
+- [x] Comparison prompt lists words to avoid and gives good and bad claim examples; measured on 8
+      real reports before and after (results in `AGENTS.md`, under the model choice)
+- [ ] Investigate intermittent 502s: the model sometimes writes a literal `...` as a package name
+      or field (`...`, `npm...`), 2 failures in 11 real runs (0 in 8 since the prompt change).
+      Read the logged output of the next failure to find the cause
 
 Tests: integration tests with a mocked fetch layer, including each error status; the existing
 mock-based tests still pass.

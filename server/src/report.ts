@@ -39,10 +39,21 @@ maintainers, dependency count and release activity, each with status ok, warning
 Rules:
 - Every claim must cite one or more fields as evidence: the package name and the field path as it
   appears in the data, for example "npm.license", "downloads.weekly" or "github.unavailable".
-- Only state what the cited fields show. Give dates and numbers instead of judgements: write
-  "last release on 2026-03-01", not "actively maintained".
+- Each claim states only the values of the fields it cites: numbers, dates, names, ranges.
+  Comparing those values between the packages given is fine ("the most of the candidates").
+- Do not add judgements, causes or consequences the data does not state. Avoid words such as
+  very, active, actively maintained, strong, solid, good, healthy, mature, popular, community,
+  adoption, lightweight, attack surface, ideal, manageable.
+- Do not bring in facts that are not in the data, such as current framework versions.
+- Do not write field paths in the claim text; they belong in the evidence only.
 - A field group marked unavailable has no data; cite its "unavailable" field and say the data is
-  unavailable.`;
+  unavailable.
+
+Examples of claim text:
+- Write "Last release on 2026-09-30; 18 releases in the last year", not "Very active development".
+- Write "41,771,731 weekly downloads, the most of the candidates", not "Strong community adoption".
+- Write "2 direct dependencies", not "Small dependency footprint that reduces attack surface".
+- Write "Peer dependency react ^0.14 || ^15", not "Not compatible with modern React".`;
 
 const GROUPS = [
   'npm',
@@ -78,33 +89,54 @@ function userPrompt({ need, framework }: ReportRequest, packages: PackageData[])
   return [`Need: ${need}`, `Framework: ${framework}`, 'Packages:', JSON.stringify(data)].join('\n');
 }
 
-// Builds the final claim, rejecting any reference to a package or field that was not fetched.
+function wasFetched(ref: ModelClaim['evidence'][number], packages: Map<string, PackageData>) {
+  const pkg = packages.get(ref.package);
+  const [group = '', key = ''] = ref.field.split('.', 2);
+  const fields = pkg && promptFields(pkg)[group];
+  return fields !== undefined && key in fields;
+}
+
+// Every package name and evidence reference in the model output that does not match the
+// fetched data. All are collected so one rejected report shows every problem.
+function invalidReferences(comparison: Comparison, packages: Map<string, PackageData>): string[] {
+  const entries = [...comparison.ranking, ...comparison.rejected];
+  const claims = [
+    ...entries.flatMap((e) => e.reasons),
+    ...comparison.security.flatMap((s) => [
+      s.license,
+      s.vulnerabilities,
+      s.maintainers,
+      s.dependencyCount,
+      s.releaseActivity,
+    ]),
+  ];
+  return [
+    ...[...entries, ...comparison.security]
+      .filter((e) => !packages.has(e.name))
+      .map((e) => `package ${e.name}`),
+    ...claims
+      .flatMap((c) => c.evidence)
+      .filter((ref) => !wasFetched(ref, packages))
+      .map((ref) => `field ${ref.package} ${ref.field}`),
+  ];
+}
+
+// References are already checked by invalidReferences(), so every lookup succeeds.
 function resolveClaim(claim: ModelClaim, packages: Map<string, PackageData>): Claim {
   const evidence = claim.evidence.map((ref) => {
-    const pkg = packages.get(ref.package);
-    const [group = '', key = ''] = ref.field.split('.', 2);
-    const fields = pkg && promptFields(pkg)[group];
-    if (!pkg || !fields || !(key in fields)) {
-      throw new AiError(`Model cited a field that was not fetched: ${ref.package} ${ref.field}`);
-    }
-    const { source, fetchedAt } = pkg[group as Group];
+    const [group] = ref.field.split('.', 1);
+    const { source, fetchedAt } = packages.get(ref.package)![group as Group];
     return { package: ref.package, field: ref.field, source, fetchedAt };
   });
   return { text: claim.text, evidence };
 }
 
-function packageFor(name: string, packages: Map<string, PackageData>): PackageData {
-  const pkg = packages.get(name);
-  if (!pkg) throw new AiError(`Model named a package that was not fetched: ${name}`);
-  return pkg;
-}
-
 function buildReport(
   request: ReportRequest,
   packageList: PackageData[],
+  packages: Map<string, PackageData>,
   comparison: Comparison,
 ): Report {
-  const packages = new Map(packageList.map((pkg) => [pkg.name, pkg]));
   const claims = (list: ModelClaim[]) => list.map((claim) => resolveClaim(claim, packages));
   const check = (c: Comparison['security'][number]['license']) => ({
     status: c.status,
@@ -112,7 +144,7 @@ function buildReport(
   });
   const entry = ({ name, reasons }: Comparison['ranking'][number]) => ({
     name,
-    version: packageFor(name, packages).version,
+    version: packages.get(name)!.version,
     reasons: claims(reasons),
   });
 
@@ -124,7 +156,7 @@ function buildReport(
     rejected: comparison.rejected.map(entry),
     security: comparison.security.map((s) => ({
       name: s.name,
-      version: packageFor(s.name, packages).version,
+      version: packages.get(s.name)!.version,
       license: check(s.license),
       vulnerabilities: check(s.vulnerabilities),
       maintainers: check(s.maintainers),
@@ -153,7 +185,15 @@ export async function compareCandidates(
     SYSTEM_PROMPT,
     userPrompt(request, packages),
   );
-  return buildReport(request, packages, comparison);
+  const byName = new Map(packages.map((pkg) => [pkg.name, pkg]));
+  const invalid = invalidReferences(comparison, byName);
+  if (invalid.length > 0) {
+    throw new AiError(
+      `Model cited data that was not fetched: ${invalid.join(', ')}`,
+      JSON.stringify(comparison),
+    );
+  }
+  return buildReport(request, packages, byName, comparison);
 }
 
 // The whole pipeline: exactly two AI calls, no retries, nothing stored.

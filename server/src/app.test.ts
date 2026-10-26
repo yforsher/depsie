@@ -78,6 +78,7 @@ function aiCalls(fetchMock: ReturnType<typeof mockPipeline>) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('POST /api/report', () => {
@@ -124,23 +125,30 @@ describe('POST /api/report', () => {
   });
 
   it('returns 502 without a retry when the model cites a field that was not fetched', async () => {
-    const fetchMock = mockPipeline(
-      comparison({ ranking: [{ name: '@hookform/resolvers', reasons: [claim('npm.stars')] }] }),
-    );
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const answer = comparison({
+      ranking: [{ name: '@hookform/resolvers', reasons: [claim('npm.stars')] }],
+    });
+    const fetchMock = mockPipeline(answer);
     const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
 
     expect(response.status).toBe(502);
-    expect(response.body.error).toContain('not fetched: @hookform/resolvers npm.stars');
+    expect(response.body.error).toContain('not fetched: field @hookform/resolvers npm.stars');
     expect(aiCalls(fetchMock)).toBe(2);
+    const logged = consoleError.mock.calls.map(([line]) => String(line));
+    const output = logged.find((line) => line.startsWith('Rejected model output: '));
+    expect(JSON.parse(output!.slice('Rejected model output: '.length))).toEqual(answer);
   });
 
   it('returns 502 when OpenRouter fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const fetchMock = mockPipeline(comparison(), 500);
     const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
 
     expect(response.status).toBe(502);
     expect(response.body.error).toMatch(/OpenRouter request failed with status 500/);
     expect(aiCalls(fetchMock)).toBe(1);
+    expect(consoleError).toHaveBeenCalledTimes(1);
   });
 
   it('returns 429 after 10 requests in an hour', async () => {

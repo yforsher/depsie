@@ -49,6 +49,21 @@ No chat and no follow-up turns: each request makes a fixed, small number of AI c
 | Repo and CI | pnpm workspaces monorepo (`client/`, `server/`, `shared/`), GitHub Actions |
 | Hosting     | One free tier host; the server serves the built client. Provider TBD       |
 
+**Model: `openai/gpt-oss-120b`**, chosen for cost. Measured on real reports (2026-10-26):
+
+- Pros: cheap (call 2 averages about $0.0007 and 6,500 prompt tokens with 5 candidates); supports
+  strict structured output through OpenRouter; a report takes about 30 seconds end to end.
+- Con, invalid references: some answers use a literal `...` as a package name or field (`...`,
+  `npm...`), 2 of 11 runs before the prompt change and 0 of 8 after. The server rejects these with
+  502 and logs the raw output; the cause is not proven yet.
+- Con, wording drift: the evidence check proves a cited field exists, not that the sentence says
+  only what it shows. Before the prompt listed words to avoid, 12% of claims added judgements
+  ("very active", "strong community adoption", "reduces attack surface") and 55% repeated field
+  paths in the text. After: 1% and 22%. Softer conclusions ("indicating recent activity", "a
+  small footprint") stayed at about 6%, so a list of words to avoid only reduces the problem.
+- If drift or failures stay too high, compare a more capable model on the same sample needs
+  before adding more prompt rules (see `docs/plan.md`, TBD).
+
 - `client/`: form, local package.json filtering, preview, report view, export. See `client/AGENTS.md`.
 - `server/`: single `POST /api/report` endpoint, data fetching, AI calls. See `server/AGENTS.md`.
 - `shared/`: request and report types used by both.

@@ -2,8 +2,16 @@ import * as z from 'zod';
 
 export const MODEL = 'openai/gpt-oss-120b';
 
-// Thrown for OpenRouter failures and invalid model output; the report endpoint maps it to 502.
-export class AiError extends Error {}
+// Thrown for OpenRouter failures and invalid model output; the report endpoint maps it to 502
+// and logs the raw model output, when there is one, so rejected answers can be investigated.
+export class AiError extends Error {
+  modelOutput?: string;
+
+  constructor(message: string, modelOutput?: string) {
+    super(message);
+    this.modelOutput = modelOutput;
+  }
+}
 
 export async function chatJson<T extends z.ZodType>(
   name: string,
@@ -41,11 +49,14 @@ export async function chatJson<T extends z.ZodType>(
   try {
     json = JSON.parse(content);
   } catch {
-    throw new AiError(`Model output is not valid JSON: ${content.slice(0, 200)}`);
+    throw new AiError(`Model output is not valid JSON: ${content.slice(0, 200)}`, content);
   }
   const result = schema.safeParse(json);
   if (!result.success) {
-    throw new AiError(`Model output does not match the schema: ${z.prettifyError(result.error)}`);
+    throw new AiError(
+      `Model output does not match the schema: ${z.prettifyError(result.error)}`,
+      content,
+    );
   }
   return result.data;
 }

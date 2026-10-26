@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { claim, comparison, mockSources } from './fixtures.js';
 import { fetchPackageData, type PackageData } from './packageData.js';
+import { AiError } from './openrouter.js';
 import { compareCandidates } from './report.js';
 
 const request = { need: 'validate forms', framework: 'React' as const };
@@ -81,7 +82,7 @@ describe('compareCandidates', () => {
     const data = await packages();
     mockOpenRouter(comparison({ ranking: [{ name: NAME, reasons: [claim('npm.stars')] }] }));
     await expect(compareCandidates(request, data)).rejects.toThrow(
-      `Model cited a field that was not fetched: ${NAME} npm.stars`,
+      `Model cited data that was not fetched: field ${NAME} npm.stars`,
     );
   });
 
@@ -90,15 +91,31 @@ describe('compareCandidates', () => {
     mockOpenRouter(
       comparison({ ranking: [{ name: NAME, reasons: [claim('npm.license', 'formik')] }] }),
     );
-    await expect(compareCandidates(request, data)).rejects.toThrow(/not fetched: formik/);
+    await expect(compareCandidates(request, data)).rejects.toThrow(/field formik npm.license/);
   });
 
   it('rejects a package name that was not fetched', async () => {
     const data = await packages();
-    mockOpenRouter(comparison({ rejected: [{ name: 'formik', reasons: [] }] }));
+    mockOpenRouter(comparison({ rejected: [{ name: '...', reasons: [] }] }));
     await expect(compareCandidates(request, data)).rejects.toThrow(
-      'Model named a package that was not fetched: formik',
+      'Model cited data that was not fetched: package ...',
     );
+  });
+
+  it('lists every invalid reference and keeps the raw model output', async () => {
+    const data = await packages();
+    const answer = comparison({
+      ranking: [{ name: NAME, reasons: [claim('npm...'), claim('npm.stars')] }],
+      rejected: [{ name: '...', reasons: [] }],
+    });
+    mockOpenRouter(answer);
+    const error = await compareCandidates(request, data).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(AiError);
+    expect((error as AiError).message).toBe(
+      `Model cited data that was not fetched: package ..., field ${NAME} npm..., field ${NAME} npm.stars`,
+    );
+    expect(JSON.parse((error as AiError).modelOutput!)).toEqual(answer);
   });
 
   it('accepts the reason for an unavailable source but not its data fields', async () => {
