@@ -67,8 +67,15 @@ failing the request.
 - `src/packageData.ts`: `fetchPackageData()` runs the fetchers for one candidate and merges the
   results into `PackageData`: one group per source with `source`, `url`, `fetchedAt` and either
   `data` or `unavailable` (the reason). A failed source never fails the request.
+- `src/report.ts`: `compareCandidates()`, AI call 2, and `generateReport()`, the whole pipeline.
+  The prompt holds each package's source groups (data, or `unavailable` with the reason) with
+  READMEs cut to 4,000 characters. The model cites `package` and `field` (`group.key`, for
+  example `npm.license`); each reference is checked against those same fields, and source and
+  fetch date are filled in from `PackageData`. Any unknown package or field throws `AiError`.
+- `POST /api/report` in `src/app.ts`: rate limited to 10 per hour per IP (429), Zod validation
+  (400), then `generateReport()`; `AiError` becomes 502 with the message.
 - `src/fixtures/`: trimmed real responses used by the fetcher tests; `src/fixtures.ts` serves
-  them through a mocked `fetch` (excluded from the build).
+  them through a mocked `fetch`, plus a valid AI call 2 answer (excluded from the build).
 - The request schema (`reportRequestSchema`) lives in `shared/` and is used by both client and
   server.
 - `.env` is loaded from the repo root with Node's `--env-file-if-exists` flag (see `package.json`

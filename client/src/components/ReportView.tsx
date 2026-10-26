@@ -86,7 +86,7 @@ export function ReportView({ report }: { report: Report }) {
         <h3>Data sources</h3>
         <ul>
           {report.sources.map((source) => (
-            <li key={source.name}>
+            <li key={`${source.name} ${source.url}`}>
               <a href={source.url}>{source.name}</a>, fetched {formatDate(source.fetchedAt)}
             </li>
           ))}

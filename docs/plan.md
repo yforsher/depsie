@@ -125,19 +125,25 @@ Success criteria: data for a few real packages is fetched and merged.
 
 ## Part 7: AI call 2, comparison report
 
-- [ ] Prompt sends only fetched data and READMEs; asks for ranking, reasons, rejected alternatives
+- [x] Prompt sends only fetched data and READMEs; asks for ranking, reasons, rejected alternatives
       and why, and security and compliance per package (license, known vulnerabilities,
       maintainers, dependency count, release activity). Data sources and fetch dates are added by
       code from `PackageData`, not by the model
-- [ ] Zod schema for the structured result; each factual claim, recommendation, and ranking includes evidence references identifying package, fetched field, source, and fetch date; keep wording close to those facts and avoid unsupported interpretations
-- [ ] Validate every evidence reference against the data fetched for the report; reject output containing references to fields that were not fetched. This validates reference existence, not semantic support, so report wording must remain close to the cited facts
-- [ ] `POST /api/report`, the only report endpoint: validates `{ need, framework, dependencies? }`
+- [x] Zod schema for the structured result; each factual claim, recommendation, and ranking includes evidence references identifying package, fetched field, source, and fetch date; keep wording close to those facts and avoid unsupported interpretations
+- [x] Validate every evidence reference against the data fetched for the report; reject output containing references to fields that were not fetched. This validates reference existence, not semantic support, so report wording must remain close to the cited facts
+- [x] `POST /api/report`, the only report endpoint: validates `{ need, framework, dependencies? }`
       with the Part 5 schema, then runs the whole pipeline (`findCandidates()`, fetch package data,
       comparison) and returns the report. Clients cannot pass their own candidate list.
-- [ ] No AI retries, so a request never exceeds two AI calls: invalid model output or an
+- [x] No AI retries, so a request never exceeds two AI calls: invalid model output or an
       OpenRouter error returns 502 with a clear message
-- [ ] Per-IP rate limit on `POST /api/report` (`express-rate-limit`, for example 10 requests per
+- [x] Per-IP rate limit on `POST /api/report` (`express-rate-limit`, for example 10 requests per
       hour) so the public endpoint cannot run up OpenRouter costs
+- [x] The model cites only package and field (`npm.license`, `github.unavailable`); code fills in
+      the source and fetch date from `PackageData`. READMEs are cut to 4,000 characters in the
+      prompt
+- [x] Real run for "A date picker component" (React): 3 ranked, 2 rejected, all evidence valid;
+      about 6,700 prompt and 3,800 completion tokens for call 2, under $0.001 per report. One
+      earlier run was rejected because the model cited a field that was not fetched
 
 Tests: OpenRouter mocked; schema validation; invalid request body returns 400; one request makes
 exactly two AI calls; invalid model output returns 502 with no retry; requests over the rate limit
