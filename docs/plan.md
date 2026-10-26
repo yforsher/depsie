@@ -173,7 +173,65 @@ mock-based tests still pass.
 
 Success criteria: need + framework in the browser produces a real report end to end.
 
-## Part 9: Share report as Markdown download
+## Part 9: Report UI redesign
+
+- [ ] Two columns on wide screens: request form on the left, result on the right; stacked on
+      narrow screens
+- [ ] The result column shows an empty state before the first request and the loading state in
+      place while a report is generated
+- [ ] Ranked candidates as cards: rank, name and version, a one-line summary, and key facts at a
+      glance (license, known vulnerabilities, last release, weekly downloads, dependency count)
+- [ ] Reasons and evidence references under each card, collapsible so the cards stay short
+- [ ] Rejected alternatives shown compactly, each with its reason
+- [ ] Clear visual hierarchy: the top recommendation stands out; status colors always keep a
+      text label; data sources and fetch date at the bottom
+- [ ] Browser check with a real report on desktop and narrow widths
+
+Tests: component tests for the empty, loading, error and report states; existing report
+rendering tests updated to the new layout.
+
+Success criteria: the user approves the look in the browser; the top recommendation and why it
+was chosen are clear without scrolling through the whole report.
+
+## Part 10: Server logging
+
+- [ ] One short log line per pipeline step of `POST /api/report`: request received (framework,
+      dependency count), AI call 1 done (candidates, duration, tokens), data fetched (failed
+      sources only), AI call 2 done (duration, tokens, cost), response sent (status, total
+      duration)
+- [ ] A request ID on every line so the lines of one request can be followed together
+- [ ] Never log the need text or dependency names; the raw model output on rejection stays as
+      it is (console only)
+- [ ] Errors log the step that failed and the reason in one line, not a stack trace for expected
+      failures (rate limit, invalid input, rejected model output)
+
+Tests: a successful request logs each step once with the same request ID; a failed step logs
+the step name and reason; the need text never appears in the log output.
+
+Success criteria: a real report in the terminal shows about six readable lines that tell what
+happened and how long each step took.
+
+## Part 11: Analytics
+
+- [ ] Choose with the user between a privacy-friendly hosted tool (for example Plausible, Umami
+      or Cloudflare Web Analytics) and server-side counts, depending on the host chosen
+- [ ] Track without login: visits, reports requested, framework, success or error status, date
+      and time, and country (from the IP, which is not stored)
+- [ ] Unique visitors per day and reports per visitor per day, from a hash of the IP with a random
+      salt that is replaced daily and never stored (no tracking across days)
+- [ ] Track usage per report: tokens and cost of both AI calls, to see how much it costs
+- [ ] Never record the need text, dependency names or the report itself
+- [x] Update the privacy constraints in `AGENTS.md` to say exactly what is collected
+- [ ] Say in the README and in the app what is collected
+- [ ] No cookies and no stored IP addresses, so no consent banner is needed
+
+Tests: the tracking call carries only the allowed fields; no tracking call contains the need or
+dependencies.
+
+Success criteria: after a few real reports the user can see who used it (country), when, how
+often and at what cost, and the collected fields match the privacy section.
+
+## Part 12: Share report as Markdown download
 
 - [ ] Build Markdown from the structured report in code (no AI call)
 - [ ] Download button saves a `.md` file

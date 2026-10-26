@@ -32,6 +32,11 @@ No chat and no follow-up turns: each request makes a fixed, small number of AI c
 - The tool must work fully without a file: need + framework is enough for a result.
 - package.json is optional and is parsed and filtered in the browser only. The server receives the need, framework, and filtered public dependency names and declared version ranges; never the raw file, scoped packages outside the allowlist, or non-registry entries. Rules in `client/AGENTS.md`.
 - No storage of user input or generated reports on the server, and no shareable reports. Nothing is cached.
+- Anonymous activity analytics only: visits, report count, framework, success or error status,
+  time, country, and AI tokens and cost per report. Unique visitors are counted per day with a
+  hash of the IP and a random salt that is replaced daily and never stored, so visitors cannot be
+  identified or followed across days. No accounts, no cookies, no IP addresses stored, and never
+  the need text, dependency names or the report.
 - The whole project is open source, so anyone can verify these privacy claims.
 
 **AI constraints**
