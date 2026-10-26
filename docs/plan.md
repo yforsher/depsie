@@ -231,7 +231,29 @@ dependencies.
 Success criteria: after a few real reports the user can see who used it (country), when, how
 often and at what cost, and the collected fields match the privacy section.
 
-## Part 12: Share report as Markdown download
+## Part 12: Production deployment
+
+- [ ] Choose a free tier host with the user; check its request timeout fits a report of about 30
+      seconds
+- [ ] Set `OPENROUTER_API_KEY` and `GITHUB_TOKEN` as host secrets, never in the repo
+- [ ] Build and start commands; `/api/health` as the host health check
+- [ ] Set Express `trust proxy` to match the host's proxy, so the rate limit and the analytics
+      country use the real client IP and a user cannot fake it with a header
+- [ ] Timeouts on the OpenRouter calls and the npm search, which have none today, so a stuck call
+      returns a clear error instead of hanging until the host cuts the request
+- [ ] Spending cap on the OpenRouter key in the OpenRouter dashboard, as a hard cost limit across
+      all IPs
+- [ ] `LICENSE` file (MIT unless the user chooses otherwise)
+- [ ] Free uptime check on `/api/health` that alerts the user when the site is down
+- [ ] Real report on the live URL in the browser
+
+Tests: the rate limit uses the client IP from the proxy header set by the host; a timed out
+OpenRouter call returns 502 with a clear message.
+
+Success criteria: the live URL produces a real report end to end; secrets are only in the host
+settings; the OpenRouter cap and uptime check are active.
+
+## Part 13: Share report as Markdown download
 
 - [ ] Build Markdown from the structured report in code (no AI call)
 - [ ] Download button saves a `.md` file
