@@ -69,7 +69,8 @@ label or icon, never color alone.
 ## Code structure
 
 - `src/main.tsx`: entry point with the TanStack Query provider.
-- `src/App.tsx`: runs the report request as a mutation and shows the form, errors and report.
+- `src/App.tsx`: runs the report request as a mutation. Two columns from 960px: the form on the
+  left, the result column on the right with an empty, loading, error or report state.
 - `src/api.ts`: `fetchReport()`, the only function that talks to the server (`POST /api/report`).
   Turns 400, 429, 502 and any other failure status into a clear error message.
 - `src/mockReport.ts`: a fixed report used by the tests.
@@ -78,8 +79,15 @@ label or icon, never color alone.
   `src/allowlist.json` holds the allowed scopes.
 - `src/components/RequestForm.tsx`: need, framework, optional package.json, extra scopes,
   validation (need at most 500 characters, at most 200 dependencies).
+  Enter in the need or framework field submits once both are filled; Shift+Enter adds a line.
 - `src/components/SentPreview.tsx`: the "what is sent" preview, including entries not sent.
-- `src/components/ReportView.tsx`: ranking, alternatives, security table, data sources.
+- `src/components/PrivacyNote.tsx`: a "How your data is handled" link under the preview that opens
+  the privacy details in a native `<dialog>`. Keep the text in line with the privacy constraints
+  in the root `AGENTS.md` whenever they change. jsdom lacks the dialog methods, so
+  `src/test-setup.ts` stubs `showModal()` and `close()`.
+- `src/components/ReportView.tsx`: one card per ranked candidate (the top pick marked
+  Recommended) with its security facts, reasons and collapsed evidence; compact rejected
+  alternatives; data sources at the bottom.
 - `src/index.css`: color tokens and all styles.
 - Tests sit next to the code as `*.test.ts(x)`; `src/test-setup.ts` registers jest-dom and
   cleanup.

@@ -48,8 +48,54 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: 'Recommendation' })).toBeInTheDocument();
     expect(screen.getByText('A date picker (React), generated 2026-10-22')).toBeInTheDocument();
-    expect(screen.getByText('1. react-day-picker@9.11.1')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'react-day-picker@9.11.1' })).toBeInTheDocument();
     expect(sentBody(fetchMock)).toEqual({ need: 'A date picker', framework: 'React' });
+  });
+
+  it('submits with Enter in the need field, while Shift+Enter adds a line', async () => {
+    const fetchMock = mockFetch(() => Response.json(mockReport));
+    const user = setup();
+    await user.selectOptions(screen.getByLabelText('Framework'), 'React');
+    await user.type(
+      screen.getByLabelText('What do you need?'),
+      'A date{Shift>}{Enter}{/Shift}picker',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await user.keyboard('{Enter}');
+    await screen.findByRole('heading', { name: 'Recommendation' });
+    expect(sentBody(fetchMock)).toEqual({ need: 'A date\npicker', framework: 'React' });
+  });
+
+  it('does not submit with Enter before the form is filled', async () => {
+    const fetchMock = mockFetch(() => Response.json(mockReport));
+    const user = setup();
+    await user.type(screen.getByLabelText('What do you need?'), 'A date picker{Enter}');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('opens and closes the privacy details from a link', async () => {
+    const user = setup();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'How your data is handled' }));
+    const privacy = screen.getByRole('dialog', { name: 'How your data is handled' });
+    expect(privacy).toHaveTextContent(
+      'Your package.json is read in your browser and is never sent.',
+    );
+    expect(privacy).toHaveTextContent('Nothing you send and no report is stored on our server.');
+
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows an empty state in the result column before the first request', () => {
+    setup();
+
+    expect(screen.getByRole('region', { name: 'Result' })).toHaveTextContent(
+      'Your recommendation appears here.',
+    );
   });
 
   it('sends only the filtered dependencies shown in the preview, never the manifest', async () => {

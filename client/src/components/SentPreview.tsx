@@ -1,4 +1,5 @@
 import type { FilterResult, SkipReason } from '../packageJson';
+import { PrivacyNote } from './PrivacyNote';
 
 const reasonLabels: Record<SkipReason, string> = {
   'scope-not-allowed': 'scope not allowed',
@@ -52,6 +53,7 @@ export function SentPreview({ need, framework, result }: Props) {
       <p className="hint">
         Your package.json itself is never sent, only the names and version ranges listed above.
       </p>
+      <PrivacyNote />
     </section>
   );
 }

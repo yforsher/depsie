@@ -25,11 +25,45 @@ body {
 }
 
 main {
-  max-width: 960px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 32px 16px;
   display: grid;
   gap: 24px;
+}
+
+.app-header h1 {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3em;
+  margin: 0;
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+/* Runs from cap height to baseline like the letters: baseline alignment puts the image's bottom on
+   the text baseline, and 0.7em is the cap height of the system UI font. */
+.app-header h1 img {
+  width: 0.7em;
+  height: 0.7em;
+}
+
+.app-header p {
+  margin: 6px 0 0;
+}
+
+.columns {
+  display: grid;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (min-width: 960px) {
+  .columns {
+    grid-template-columns: minmax(320px, 400px) minmax(0, 1fr);
+  }
 }
 
 h1,
@@ -92,8 +126,11 @@ button:hover {
   background: var(--accent-hover);
 }
 
+/* A gray "not ready" cursor, 32px (the largest size Windows shows reliably); 16 16 is its center. */
 button:disabled {
-  cursor: not-allowed;
+  cursor:
+    url('/cursor-disabled.svg') 16 16,
+    not-allowed;
   opacity: 0.5;
 }
 
@@ -137,6 +174,15 @@ summary {
   display: block;
 }
 
+.evidence-list {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.evidence-list li {
+  margin-bottom: 8px;
+}
+
 .preview {
   border-top: 1px solid var(--border);
   padding-top: 12px;
@@ -152,14 +198,14 @@ summary {
 }
 
 .deps,
-.claims,
-.cards {
+.reasons {
   margin: 0;
   padding-left: 20px;
 }
 
 .cards {
   list-style: none;
+  margin: 0;
   padding: 0;
   display: grid;
   gap: 12px;
@@ -170,31 +216,225 @@ summary {
   margin: 0;
 }
 
+/* Empty, loading and error states hold the result column's place. */
+.placeholder {
+  margin: 0;
+  padding: 32px 24px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+}
+
+.placeholder p {
+  margin: 0;
+}
+
+.progress {
+  height: 4px;
+  margin-bottom: 16px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--surface-raised) 30%,
+    var(--accent) 50%,
+    var(--surface-raised) 70%
+  );
+  background-size: 300% 100%;
+  animation: progress 1.6s linear infinite;
+}
+
+@keyframes progress {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress {
+    animation: none;
+    background: var(--accent);
+  }
+}
+
 .report {
   display: grid;
   gap: 24px;
 }
 
-.table-scroll {
-  overflow-x: auto;
+.report header p {
+  margin: 0;
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
+.candidate {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
   background: var(--surface);
-}
-
-th,
-td {
-  text-align: left;
-  vertical-align: top;
-  padding: 8px;
   border: 1px solid var(--border);
+  border-radius: 8px;
+  container-type: inline-size;
 }
 
-th {
+.candidate h4 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.candidate h4 a {
   color: var(--text);
+  text-decoration: none;
+}
+
+.candidate h4 a:hover {
+  text-decoration: underline;
+}
+
+.version {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* The top pick is the one thing that should stand out on the page. */
+.candidate.top {
+  padding: 20px;
+  border-color: var(--success);
+}
+
+.candidate.top h4 {
+  font-size: 1.5rem;
+}
+
+.candidate-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.rank {
+  min-width: 1.5ch;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.top .rank {
+  font-size: 2rem;
+  color: var(--success);
+}
+
+.badge {
+  padding: 2px 10px;
+  border: 1px solid var(--success);
+  border-radius: 999px;
+  color: var(--success);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+/* Five facts read best as 3 + 2; auto-fit left a single orphan on the second row. */
+@container (min-width: 480px) {
+  .facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.fact {
+  padding: 8px 10px;
+  background: var(--surface-raised);
+  border-left: 3px solid var(--border);
+  border-radius: 4px;
+}
+
+.fact dt {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+.fact dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.9375rem;
+}
+
+.fact-warning {
+  border-left-color: var(--warning);
+}
+
+.fact-danger {
+  border-left-color: var(--danger);
+}
+
+.candidate.rejected {
+  gap: 8px;
+  padding: 12px 16px;
+  background: transparent;
+}
+
+.candidate.rejected h4 {
+  font-size: 1rem;
+}
+
+.rejected .facts {
+  margin-top: 8px;
+}
+
+.sources {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+}
+
+.link-button {
+  padding: 0;
+  color: var(--accent);
+  background: none;
+  font-size: 0.875rem;
+  font-weight: 400;
+  text-decoration: underline;
+}
+
+.link-button:hover {
+  color: var(--accent-hover);
+  background: none;
+}
+
+.privacy {
+  max-width: min(60ch, calc(100vw - 32px));
+  padding: 24px;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.privacy::backdrop {
+  background: rgb(0 0 0 / 0.6);
+}
+
+.privacy ul {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 20px;
+}
+
+.privacy ul,
+.sources ul {
+  padding-left: 20px;
+}
+
+.sources ul {
+  margin: 0;
 }
 
 .status {

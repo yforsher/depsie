@@ -175,17 +175,21 @@ Success criteria: need + framework in the browser produces a real report end to 
 
 ## Part 9: Report UI redesign
 
-- [ ] Two columns on wide screens: request form on the left, result on the right; stacked on
+- [x] Two columns on wide screens: request form on the left, result on the right; stacked on
       narrow screens
-- [ ] The result column shows an empty state before the first request and the loading state in
+- [x] The result column shows an empty state before the first request and the loading state in
       place while a report is generated
-- [ ] Ranked candidates as cards: rank, name and version, a one-line summary, and key facts at a
-      glance (license, known vulnerabilities, last release, weekly downloads, dependency count)
-- [ ] Reasons and evidence references under each card, collapsible so the cards stay short
-- [ ] Rejected alternatives shown compactly, each with its reason
-- [ ] Clear visual hierarchy: the top recommendation stands out; status colors always keep a
+- [x] Ranked candidates as cards: rank, name and version (linked to npm), reasons, and key facts at
+      a glance from the security summary (license, known vulnerabilities, maintainers, dependency
+      count, release activity). Weekly downloads and a one-line summary are not in the report
+      data, so they were left out rather than adding server fields
+- [x] Evidence under each card, collapsed so the cards stay short; the separate security table is
+      gone since its facts are now on each card
+- [x] Rejected alternatives shown compactly with their reasons; facts and evidence collapsed
+- [x] Clear visual hierarchy: the top recommendation stands out; status colors always keep a
       text label; data sources and fetch date at the bottom
-- [ ] Browser check with a real report on desktop and narrow widths
+- [ ] Browser check with a real report: desktop done ("A date picker component", React); narrow
+      width not checked yet, the browser window could not be resized
 
 Tests: component tests for the empty, loading, error and report states; existing report
 rendering tests updated to the new layout.

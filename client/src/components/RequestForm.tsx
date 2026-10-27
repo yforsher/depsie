@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type KeyboardEvent } from 'react';
 import { frameworks, type Framework, type ReportRequest } from 'shared';
 import { filterDependencies, parsePackageJson, parseScopes } from '../packageJson';
 import { SentPreview } from './SentPreview';
@@ -33,6 +33,13 @@ export function RequestForm({ onSubmit, isPending }: Props) {
     onSubmit(request);
   }
 
+  // Enter submits from the need and framework fields; Shift+Enter still adds a line to the need.
+  function handleEnter(event: KeyboardEvent<HTMLTextAreaElement | HTMLSelectElement>) {
+    if (event.key !== 'Enter' || event.shiftKey) return;
+    event.preventDefault();
+    if (isFilled && !isPending) event.currentTarget.form!.requestSubmit();
+  }
+
   async function handleUpload(file: File | undefined) {
     if (file) setPackageJson(await file.text());
   }
@@ -45,10 +52,11 @@ export function RequestForm({ onSubmit, isPending }: Props) {
         rows={3}
         value={need}
         onChange={(e) => setNeed(e.target.value)}
+        onKeyDown={handleEnter}
         placeholder="A date picker with range selection and keyboard support"
       />
       <p className="hint">
-        {need.length}/{maxNeedLength} characters
+        {need.length}/{maxNeedLength} characters. Enter submits, Shift+Enter adds a line.
       </p>
 
       <label htmlFor="framework">Framework</label>
@@ -56,6 +64,7 @@ export function RequestForm({ onSubmit, isPending }: Props) {
         id="framework"
         value={framework}
         onChange={(e) => setFramework(e.target.value as Framework | '')}
+        onKeyDown={handleEnter}
       >
         <option value="">Select a framework</option>
         {frameworks.map((name) => (

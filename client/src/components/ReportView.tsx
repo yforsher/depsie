@@ -1,4 +1,12 @@
-import type { CheckStatus, Claim, Report, SecurityCheck, SecuritySummary } from 'shared';
+import type {
+  CheckStatus,
+  Claim,
+  RankedCandidate,
+  RejectedAlternative,
+  Report,
+  SecurityCheck,
+  SecuritySummary,
+} from 'shared';
 
 const statusLabels: Record<CheckStatus, string> = {
   ok: 'OK',
@@ -6,7 +14,7 @@ const statusLabels: Record<CheckStatus, string> = {
   danger: 'Risk',
 };
 
-const securityColumns: { key: keyof Omit<SecuritySummary, 'name' | 'version'>; label: string }[] = [
+const factLabels: { key: keyof Omit<SecuritySummary, 'name' | 'version'>; label: string }[] = [
   { key: 'license', label: 'License' },
   { key: 'vulnerabilities', label: 'Known vulnerabilities' },
   { key: 'maintainers', label: 'Maintainers' },
@@ -15,74 +23,46 @@ const securityColumns: { key: keyof Omit<SecuritySummary, 'name' | 'version'>; l
 ];
 
 export function ReportView({ report }: { report: Report }) {
+  const facts = (name: string) => report.security.find((s) => s.name === name);
+
   return (
     <article className="report" aria-labelledby="report-title">
-      <h2 id="report-title">Recommendation</h2>
-      <p className="hint">
-        {report.need} ({report.framework}), generated {formatDate(report.generatedAt)}
-      </p>
+      <header>
+        <h2 id="report-title">Recommendation</h2>
+        <p className="hint">
+          {report.need} ({report.framework}), generated {formatDate(report.generatedAt)}
+        </p>
+      </header>
 
-      <section>
-        <h3>Ranking</h3>
+      <section aria-labelledby="ranking-title">
+        <h3 id="ranking-title">Ranking</h3>
         <ol className="cards">
           {report.ranking.map((candidate) => (
-            <li key={candidate.name} className="panel">
-              <h4>
-                {candidate.rank}. {candidate.name}@{candidate.version}
-              </h4>
-              <Claims claims={candidate.reasons} />
-            </li>
+            <CandidateCard
+              key={candidate.name}
+              candidate={candidate}
+              facts={facts(candidate.name)}
+            />
           ))}
         </ol>
       </section>
 
-      <section>
-        <h3>Alternatives considered</h3>
-        <ul className="cards">
-          {report.rejected.map((alternative) => (
-            <li key={alternative.name} className="panel">
-              <h4>
-                {alternative.name}@{alternative.version}
-              </h4>
-              <Claims claims={alternative.reasons} />
-            </li>
-          ))}
-        </ul>
-      </section>
+      {report.rejected.length > 0 && (
+        <section aria-labelledby="rejected-title">
+          <h3 id="rejected-title">Alternatives considered</h3>
+          <ul className="cards">
+            {report.rejected.map((alternative) => (
+              <RejectedItem
+                key={alternative.name}
+                alternative={alternative}
+                facts={facts(alternative.name)}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
 
-      <section>
-        <h3>Security and compliance</h3>
-        <div className="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Package</th>
-                {securityColumns.map((column) => (
-                  <th key={column.key} scope="col">
-                    {column.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {report.security.map((summary) => (
-                <tr key={summary.name}>
-                  <th scope="row">
-                    {summary.name}@{summary.version}
-                  </th>
-                  {securityColumns.map((column) => (
-                    <td key={column.key}>
-                      <Check check={summary[column.key]} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section>
+      <footer className="sources">
         <h3>Data sources</h3>
         <ul>
           {report.sources.map((source) => (
@@ -91,42 +71,127 @@ export function ReportView({ report }: { report: Report }) {
             </li>
           ))}
         </ul>
-      </section>
+      </footer>
     </article>
   );
 }
 
-function Claims({ claims }: { claims: Claim[] }) {
+interface CardProps {
+  candidate: RankedCandidate;
+  facts: SecuritySummary | undefined;
+}
+
+function CandidateCard({ candidate, facts }: CardProps) {
+  const isTop = candidate.rank === 1;
   return (
-    <ul className="claims">
+    <li className={isTop ? 'candidate top' : 'candidate'}>
+      <div className="candidate-head">
+        <span className="rank" aria-hidden="true">
+          {candidate.rank}
+        </span>
+        <h4>
+          <PackageName name={candidate.name} version={candidate.version} />
+        </h4>
+        {isTop && <span className="badge">Recommended</span>}
+      </div>
+      {facts && <Facts summary={facts} />}
+      <Reasons claims={candidate.reasons} />
+      <EvidenceDetails claims={[...candidate.reasons, ...factChecks(facts)]} />
+    </li>
+  );
+}
+
+interface RejectedProps {
+  alternative: RejectedAlternative;
+  facts: SecuritySummary | undefined;
+}
+
+function RejectedItem({ alternative, facts }: RejectedProps) {
+  return (
+    <li className="candidate rejected">
+      <h4>
+        <PackageName name={alternative.name} version={alternative.version} />
+      </h4>
+      <Reasons claims={alternative.reasons} />
+      <details>
+        <summary>Facts and evidence</summary>
+        {facts && <Facts summary={facts} />}
+        <EvidenceList claims={[...alternative.reasons, ...factChecks(facts)]} />
+      </details>
+    </li>
+  );
+}
+
+function PackageName({ name, version }: { name: string; version: string }) {
+  return (
+    <a href={`https://www.npmjs.com/package/${name}/v/${version}`}>
+      {name}
+      <span className="version">@{version}</span>
+    </a>
+  );
+}
+
+function Facts({ summary }: { summary: SecuritySummary }) {
+  return (
+    <dl className="facts">
+      {factLabels.map(({ key, label }) => (
+        <Fact key={key} label={label} check={summary[key]} />
+      ))}
+    </dl>
+  );
+}
+
+function Fact({ label, check }: { label: string; check: SecurityCheck }) {
+  return (
+    <div className={`fact fact-${check.status}`}>
+      <dt>{label}</dt>
+      <dd>
+        <span className={`status status-${check.status}`}>{statusLabels[check.status]}</span>{' '}
+        {check.text}
+      </dd>
+    </div>
+  );
+}
+
+function Reasons({ claims }: { claims: Claim[] }) {
+  return (
+    <ul className="reasons">
+      {claims.map((claim) => (
+        <li key={claim.text}>{claim.text}</li>
+      ))}
+    </ul>
+  );
+}
+
+function EvidenceDetails({ claims }: { claims: Claim[] }) {
+  return (
+    <details>
+      <summary>Evidence</summary>
+      <EvidenceList claims={claims} />
+    </details>
+  );
+}
+
+// Each claim with the fetched fields it cites, so every sentence can be checked.
+function EvidenceList({ claims }: { claims: Claim[] }) {
+  return (
+    <ul className="evidence-list">
       {claims.map((claim) => (
         <li key={claim.text}>
           {claim.text}
-          <Evidence claim={claim} />
+          {claim.evidence.map((ref) => (
+            <span key={`${ref.package} ${ref.field}`} className="evidence">
+              {`${ref.package} ${ref.field}, ${ref.source}, ${formatDate(ref.fetchedAt)}`}
+            </span>
+          ))}
         </li>
       ))}
     </ul>
   );
 }
 
-function Check({ check }: { check: SecurityCheck }) {
-  return (
-    <>
-      <span className={`status status-${check.status}`}>{statusLabels[check.status]}</span>{' '}
-      {check.text}
-      <Evidence claim={check} />
-    </>
-  );
-}
-
-function Evidence({ claim }: { claim: Claim }) {
-  return (
-    <span className="evidence">
-      {claim.evidence
-        .map((ref) => `${ref.package} ${ref.field}, ${ref.source}, ${formatDate(ref.fetchedAt)}`)
-        .join('; ')}
-    </span>
-  );
+function factChecks(summary: SecuritySummary | undefined) {
+  return summary ? factLabels.map(({ key }) => summary[key]) : [];
 }
 
 function formatDate(iso: string) {

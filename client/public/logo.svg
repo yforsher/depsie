@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <!-- A parent package branching to two candidates; the green branch is the pick. -->
+  <rect width="32" height="32" rx="8" fill="#1B2B4A"/>
+  <path d="M15 10 9 22" stroke="#8494AE" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M17 10 23 21" stroke="#3DD68C" stroke-width="2.6" stroke-linecap="round"/>
+  <circle cx="16" cy="9" r="3.6" fill="#5AB0FF"/>
+  <circle cx="9" cy="23" r="2.8" fill="#8494AE"/>
+  <circle cx="23" cy="22.5" r="4.4" fill="#3DD68C"/>
+</svg>
