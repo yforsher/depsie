@@ -2,6 +2,7 @@ import express, { type ErrorRequestHandler } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { reportRequestSchema } from 'shared';
 import * as z from 'zod';
+import { recordVisit, reportAnalytics, setFramework } from './analytics.js';
 import { log, requestLogging } from './log.js';
 import { AiError } from './openrouter.js';
 import { generateReport } from './report.js';
@@ -28,24 +29,34 @@ export function createApp(clientDir: string) {
     },
   });
 
-  app.post('/api/report', requestLogging, reportLimiter, express.json(), async (req, res) => {
-    const parsed = reportRequestSchema.safeParse(req.body);
-    if (!parsed.success) {
-      const error = z.prettifyError(parsed.error);
-      log(`invalid input: ${error.replaceAll('\n', ' ')}`);
-      res.status(400).json({ error });
-      return;
-    }
-    const { framework, dependencies = [] } = parsed.data;
-    log(`request received: framework ${framework}, ${dependencies.length} dependencies`);
-    res.json(await generateReport(parsed.data));
-  });
+  app.post(
+    '/api/report',
+    requestLogging,
+    reportAnalytics,
+    reportLimiter,
+    express.json(),
+    async (req, res) => {
+      const parsed = reportRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        const error = z.prettifyError(parsed.error);
+        log(`invalid input: ${error.replaceAll('\n', ' ')}`);
+        res.status(400).json({ error });
+        return;
+      }
+      const { framework, dependencies = [] } = parsed.data;
+      setFramework(framework);
+      log(`request received: framework ${framework}, ${dependencies.length} dependencies`);
+      res.json(await generateReport(parsed.data));
+    },
+  );
 
-  app.use(express.static(clientDir));
+  // index: false sends the app shell through the fallback below, where visits are counted.
+  app.use(express.static(clientDir, { index: false }));
 
   // Client routes get the app shell; unknown API paths fall through to a 404.
   app.get('/{*splat}', (req, res, next) => {
     if (req.path.startsWith('/api/')) return next();
+    recordVisit(req);
     res.sendFile('index.html', { root: clientDir });
   });
 

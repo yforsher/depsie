@@ -2,8 +2,8 @@
 
 Node, Express, TypeScript, Zod for input validation. Tests with Vitest and Supertest.
 
-The server is the only place that holds API keys (`OPENROUTER_API_KEY`, `GITHUB_TOKEN` in `.env`,
-never in the repo) and talks to outside services.
+The server is the only place that holds API keys (`OPENROUTER_API_KEY`, `GITHUB_TOKEN`,
+`DATABASE_URL` in `.env`, never in the repo) and talks to outside services.
 
 ## Endpoints
 
@@ -51,6 +51,9 @@ failing the request.
 
 - All package data is fetched on every request; nothing is cached.
 - User input and reports are never stored.
+- Anonymous analytics go to one `events` table in Neon Postgres (`sql/schema.sql`, created by
+  hand in the Neon SQL editor). The `main` branch is production, the `dev` branch is for local
+  runs. Only the columns in that file are written.
 
 ## Code structure
 
@@ -63,6 +66,12 @@ failing the request.
   code can log without passing the ID around. Lines: request received, each AI call (duration,
   tokens, cost), data fetched (failed sources), the failed step and reason, response sent (status,
   total duration). Never the need text or dependency names.
+- `src/analytics.ts`: records a `visit` when the app shell is served and a `report` row when a
+  `POST /api/report` response finishes (any status, including 400 and 429), with the framework
+  and the summed tokens and cost of the AI calls (`addUsage()` from `chatJson()`). The visitor is
+  a SHA-256 hash of the IP with a salt kept in memory and replaced each UTC day; country comes
+  from `geoip-country` (bundled GeoLite2 data, no outside call). Writes use the Neon HTTP driver,
+  are not awaited and only log on failure, so analytics never delay or fail a response.
 - `src/openrouter.ts`: `MODEL` (the one place the model ID is set) and `chatJson()`, which sends a
   Zod schema as JSON Schema and validates the answer with it. Failures throw `AiError`, which
   carries the step name (`query_expansion` or `comparison`).

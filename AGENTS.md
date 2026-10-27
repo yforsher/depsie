@@ -45,14 +45,15 @@ No chat and no follow-up turns: each request makes a fixed, small number of AI c
 
 ## Technical Decisions
 
-| Layer       | Choice                                                                     |
-| ----------- | -------------------------------------------------------------------------- |
-| Client      | React, TypeScript, Vite, TanStack Query                                    |
-| Server      | Node, Express, TypeScript, Zod                                             |
-| AI          | OpenRouter API (`openai/gpt-oss-120b`) with structured JSON output         |
-| Tests       | Vitest, React Testing Library, Supertest                                   |
-| Repo and CI | pnpm workspaces monorepo (`client/`, `server/`, `shared/`), GitHub Actions |
-| Hosting     | One free tier host; the server serves the built client. Provider TBD       |
+| Layer       | Choice                                                                                |
+| ----------- | ------------------------------------------------------------------------------------- |
+| Client      | React, TypeScript, Vite, TanStack Query                                               |
+| Server      | Node, Express, TypeScript, Zod                                                        |
+| AI          | OpenRouter API (`openai/gpt-oss-120b`) with structured JSON output                    |
+| Analytics   | Neon Postgres (free plan), one `events` table; country from a bundled GeoLite2 lookup |
+| Tests       | Vitest, React Testing Library, Supertest                                              |
+| Repo and CI | pnpm workspaces monorepo (`client/`, `server/`, `shared/`), GitHub Actions            |
+| Hosting     | One free tier host; the server serves the built client. Provider TBD                  |
 
 **Model: `openai/gpt-oss-120b`**, chosen for cost. Measured on real reports (2026-10-26):
 

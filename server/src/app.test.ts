@@ -6,6 +6,19 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from './app.js';
 import { claim, comparison, sourceResponse, usage } from './fixtures.js';
 
+// Each analytics write is captured as its values, in the column order of sql/schema.sql:
+// kind, visitor, country, framework, status, prompt_tokens, completion_tokens, cost.
+const db = vi.hoisted(() => ({ inserts: [] as unknown[][], fail: false }));
+vi.mock('@neondatabase/serverless', () => ({
+  neon:
+    () =>
+    async (_sql: TemplateStringsArray, ...values: unknown[]) => {
+      if (db.fail) throw new Error('database unreachable');
+      db.inserts.push(values);
+      return [];
+    },
+}));
+
 const clientDir = mkdtempSync(join(tmpdir(), 'client-dist-'));
 writeFileSync(join(clientDir, 'index.html'), '<div id="root"></div>');
 writeFileSync(join(clientDir, 'app.js'), 'console.log("app")');
@@ -80,6 +93,8 @@ function aiCalls(fetchMock: ReturnType<typeof mockPipeline>) {
 }
 
 afterEach(() => {
+  db.inserts = [];
+  db.fail = false;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -251,5 +266,80 @@ describe('POST /api/report logging', () => {
     expect(output).toContain('1 dependencies');
     expect(output).not.toContain(need);
     expect(output).not.toContain('private-dep-name');
+  });
+});
+
+describe('analytics', () => {
+  const visitor = expect.stringMatching(/^[0-9a-f]{16}$/);
+
+  it('records a report with only the allowed fields and the usage of both AI calls', async () => {
+    mockPipeline();
+    await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    await vi.waitFor(() => expect(db.inserts).toHaveLength(1));
+    // Supertest connects from localhost, which has no country.
+    expect(db.inserts[0]).toEqual([
+      'report',
+      visitor,
+      null,
+      'React',
+      200,
+      2 * usage.prompt_tokens,
+      2 * usage.completion_tokens,
+      2 * usage.cost,
+    ]);
+  });
+
+  it('never records the need text or dependency names', async () => {
+    mockPipeline();
+    const need = 'a secret internal need';
+    await request(createApp(clientDir))
+      .post('/api/report')
+      .send({ ...reportBody, need, dependencies: [{ name: 'private-dep-name', range: '^1.0.0' }] });
+
+    await vi.waitFor(() => expect(db.inserts).toHaveLength(1));
+    const recorded = JSON.stringify(db.inserts);
+    expect(recorded).not.toContain(need);
+    expect(recorded).not.toContain('private-dep-name');
+  });
+
+  it('records rejected requests with their status and no framework or usage', async () => {
+    mockPipeline();
+    await request(createApp(clientDir)).post('/api/report').send({ need: '', framework: 'React' });
+
+    await vi.waitFor(() => expect(db.inserts).toHaveLength(1));
+    expect(db.inserts[0]).toEqual(['report', visitor, null, null, 400, 0, 0, 0]);
+  });
+
+  it('records a visit when the app shell is served, not for assets', async () => {
+    const app = createApp(clientDir);
+    await request(app).get('/');
+    await request(app).get('/app.js');
+
+    await vi.waitFor(() => expect(db.inserts).toHaveLength(1));
+    expect(db.inserts[0]).toEqual(['visit', visitor, null, null, null, null, null, null]);
+  });
+
+  it('gives the same visitor the same hash within a day', async () => {
+    const app = createApp(clientDir);
+    await request(app).get('/');
+    await request(app).get('/');
+
+    await vi.waitFor(() => expect(db.inserts).toHaveLength(2));
+    expect(db.inserts[0]![1]).toBe(db.inserts[1]![1]);
+  });
+
+  it('logs a failed write without affecting the response', async () => {
+    const lines = logLines();
+    db.fail = true;
+    const response = await request(createApp(clientDir)).get('/');
+
+    expect(response.status).toBe(200);
+    await vi.waitFor(() =>
+      expect(lines()).toContainEqual({
+        id: 'analytics',
+        text: 'analytics failed: database unreachable',
+      }),
+    );
   });
 });

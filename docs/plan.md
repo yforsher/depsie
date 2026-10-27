@@ -224,17 +224,22 @@ happened and how long each step took.
 
 ## Part 11: Analytics
 
-- [ ] Choose with the user between a privacy-friendly hosted tool (for example Plausible, Umami
-      or Cloudflare Web Analytics) and server-side counts, depending on the host chosen
-- [ ] Track without login: visits, reports requested, framework, success or error status, date
+- [x] Choose with the user between a privacy-friendly hosted tool (for example Plausible, Umami
+      or Cloudflare Web Analytics) and server-side counts, depending on the host chosen. Chosen:
+      server-side counts in Neon Postgres (free plan, wakes by itself after idle), one project
+      with a `main` branch for production and a `dev` branch for local runs
+- [x] Track without login: visits, reports requested, framework, success or error status, date
       and time, and country (from the IP, which is not stored)
-- [ ] Unique visitors per day and reports per visitor per day, from a hash of the IP with a random
+- [x] Unique visitors per day and reports per visitor per day, from a hash of the IP with a random
       salt that is replaced daily and never stored (no tracking across days)
-- [ ] Track usage per report: tokens and cost of both AI calls, to see how much it costs
-- [ ] Never record the need text, dependency names or the report itself
+- [x] Track usage per report: tokens and cost of both AI calls, to see how much it costs
+- [x] Never record the need text, dependency names or the report itself
 - [x] Update the privacy constraints in `AGENTS.md` to say exactly what is collected
-- [ ] Say in the README and in the app what is collected
-- [ ] No cookies and no stored IP addresses, so no consent banner is needed
+- [x] Say in the README and in the app what is collected
+- [x] No cookies and no stored IP addresses, so no consent banner is needed
+- [x] Real run on the dev branch: one visit, one real report (200, 6,837 + 3,164 tokens,
+      $0.00112) and one invalid request (400) recorded as three rows; country is null on
+      localhost and needs `trust proxy` behind the host (Part 12)
 
 Tests: the tracking call carries only the allowed fields; no tracking call contains the need or
 dependencies.
@@ -246,7 +251,9 @@ often and at what cost, and the collected fields match the privacy section.
 
 - [ ] Choose a free tier host with the user; check its request timeout fits a report of about 30
       seconds
-- [ ] Set `OPENROUTER_API_KEY` and `GITHUB_TOKEN` as host secrets, never in the repo
+- [ ] Set `OPENROUTER_API_KEY`, `GITHUB_TOKEN` and `DATABASE_URL` (the Neon `main` branch, already
+      in the local `.env` as `DATABASE_URL_PROD`; its `events` table exists) as host secrets, never
+      in the repo
 - [ ] Build and start commands; `/api/health` as the host health check
 - [ ] Set Express `trust proxy` to match the host's proxy, so the rate limit and the analytics
       country use the real client IP and a user cannot fake it with a header

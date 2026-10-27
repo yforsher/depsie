@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { addUsage } from './analytics.js';
 import { log, secondsSince } from './log.js';
 
 export const MODEL = 'openai/gpt-oss-120b';
@@ -62,6 +63,7 @@ export async function chatJson<T extends z.ZodType>(
     usage: Usage;
   };
   const { prompt_tokens, completion_tokens, cost } = data.usage;
+  addUsage(prompt_tokens, completion_tokens, cost);
   log(
     `${name} done in ${secondsSince(start)}: ${prompt_tokens} prompt + ${completion_tokens} completion tokens, $${cost.toFixed(5)}`,
   );

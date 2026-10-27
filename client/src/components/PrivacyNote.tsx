@@ -31,6 +31,13 @@ export function PrivacyNote() {
             cookies.
           </li>
           <li>
+            Anonymous usage counts are stored: page visits and reports with the time, country,
+            framework, success or error status, and the AI tokens and cost. Unique visitors are
+            counted per day with a hash of the IP and a salt that changes daily and is never stored,
+            so visitors cannot be identified or followed across days. The IP address, the need, the
+            dependencies and the report are never recorded.
+          </li>
+          <li>
             Package data comes from public sources: npm, deps.dev, OSV.dev, GitHub and jsDelivr.
           </li>
           <li>
