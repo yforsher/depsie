@@ -17,6 +17,9 @@ const routes: [string, string][] = [
   ['https://cdn.jsdelivr.net/npm/', 'readme'],
 ];
 
+// Token counts and cost as OpenRouter reports them on every response.
+export const usage = { prompt_tokens: 166, completion_tokens: 267, cost: 0.00005304 };
+
 export const JSDELIVR_README = '# Resolvers\n\nREADME from the published package files.';
 
 // Serves each source's fixture by URL; sources listed in `failing` return status 500, and

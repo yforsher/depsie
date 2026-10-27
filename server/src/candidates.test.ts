@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { findCandidates } from './candidates.js';
+import { usage } from './fixtures.js';
 
 const request = { need: 'validate forms', framework: 'React' as const };
 
@@ -12,7 +13,10 @@ function mockFetch(
 ) {
   const fetchMock = vi.fn(async (url: string) => {
     if (url.startsWith('https://openrouter.ai')) {
-      return Response.json({ choices: [{ message: { content: JSON.stringify(expansion) } }] });
+      return Response.json({
+        choices: [{ message: { content: JSON.stringify(expansion) } }],
+        usage,
+      });
     }
     const { pathname, searchParams } = new URL(url);
     if (pathname === '/-/v1/search') {

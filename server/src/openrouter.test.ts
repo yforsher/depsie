@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 import { AiError, MODEL, chatJson } from './openrouter.js';
+import { usage } from './fixtures.js';
 
 const schema = z.object({ packages: z.array(z.string()) });
 
 function mockOpenRouter(content: string, status = 200) {
   const fetchMock = vi.fn(async () =>
-    Response.json({ choices: [{ message: { content } }] }, { status }),
+    Response.json({ choices: [{ message: { content } }], usage }, { status }),
   );
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
@@ -41,7 +42,7 @@ describe('chatJson', () => {
   it('rejects output that is not JSON', async () => {
     mockOpenRouter('not json');
     await expect(chatJson('test', schema, 'system', 'user')).rejects.toThrow(
-      new AiError('Model output is not valid JSON: not json', 'not json'),
+      new AiError('test', 'Model output is not valid JSON: not json', 'not json'),
     );
   });
 

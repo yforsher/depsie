@@ -2,6 +2,7 @@ import type { Claim, DataSource, Report, ReportRequest } from 'shared';
 import * as z from 'zod';
 import { findCandidates } from './candidates.js';
 import { AiError, chatJson } from './openrouter.js';
+import { log, secondsSince } from './log.js';
 import { fetchPackageData, type PackageData } from './packageData.js';
 
 // READMEs are the bulk of the prompt; a cap keeps the cost per request bounded.
@@ -206,6 +207,7 @@ export async function compareCandidates(
   const invalid = invalidReferences(comparison, byName);
   if (invalid.length > 0) {
     throw new AiError(
+      'comparison',
       `Model cited data that was not fetched: ${invalid.join(', ')}`,
       JSON.stringify(comparison),
     );
@@ -213,6 +215,7 @@ export async function compareCandidates(
   const missing = missingCoverage(comparison, packages);
   if (missing.length > 0) {
     throw new AiError(
+      'comparison',
       `Model output is incomplete: ${missing.join(', ')}`,
       JSON.stringify(comparison),
     );
@@ -223,6 +226,19 @@ export async function compareCandidates(
 // The whole pipeline: exactly two AI calls, no retries, nothing stored.
 export async function generateReport(request: ReportRequest): Promise<Report> {
   const candidates = await findCandidates(request);
+  const start = performance.now();
   const packages = await Promise.all(candidates.map(fetchPackageData));
+  log(
+    `data fetched for ${packages.length} candidates in ${secondsSince(start)}; failed sources: ${failedSources(packages).join(', ') || 'none'}`,
+  );
   return compareCandidates(request, packages);
+}
+
+function failedSources(packages: PackageData[]): string[] {
+  return packages.flatMap((pkg) =>
+    GROUPS.flatMap((group) => {
+      const result = pkg[group];
+      return 'unavailable' in result ? [`${pkg.name} ${group} (${result.unavailable})`] : [];
+    }),
+  );
 }

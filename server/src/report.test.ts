@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { claim, comparison, mockSources } from './fixtures.js';
+import { claim, comparison, mockSources, usage } from './fixtures.js';
 import { fetchPackageData, type PackageData } from './packageData.js';
 import { AiError } from './openrouter.js';
 import { compareCandidates } from './report.js';
@@ -14,7 +14,7 @@ async function packages(failing: string[] = []): Promise<PackageData[]> {
 
 function mockOpenRouter(content: unknown) {
   const fetchMock = vi.fn(async () =>
-    Response.json({ choices: [{ message: { content: JSON.stringify(content) } }] }),
+    Response.json({ choices: [{ message: { content: JSON.stringify(content) } }], usage }),
   );
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;

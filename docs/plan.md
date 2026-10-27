@@ -166,7 +166,10 @@ Success criteria: a report is generated for a sample need and returned without b
       real reports before and after (results in `AGENTS.md`, under the model choice)
 - [ ] Investigate intermittent 502s: the model sometimes writes a literal `...` as a package name
       or field (`...`, `npm...`), 2 failures in 11 real runs (0 in 8 since the prompt change).
-      Read the logged output of the next failure to find the cause
+      Read the logged output of the next failure to find the cause. First logged failure
+      (2026-10-27): the model wrote its reasoning text into the first package name and filled the
+      rest with a template of `...` placeholders, after only 590 completion tokens; the cause of
+      that output is not proven yet
 
 Tests: integration tests with a mocked fetch layer, including each error status; the existing
 mock-based tests still pass.
@@ -200,15 +203,18 @@ was chosen are clear without scrolling through the whole report.
 
 ## Part 10: Server logging
 
-- [ ] One short log line per pipeline step of `POST /api/report`: request received (framework,
+- [x] One short log line per pipeline step of `POST /api/report`: request received (framework,
       dependency count), AI call 1 done (candidates, duration, tokens), data fetched (failed
       sources only), AI call 2 done (duration, tokens, cost), response sent (status, total
-      duration)
-- [ ] A request ID on every line so the lines of one request can be followed together
-- [ ] Never log the need text or dependency names; the raw model output on rejection stays as
+      duration). The candidate count is on the data fetched line, which also says "none" when
+      no source failed
+- [x] A request ID on every line so the lines of one request can be followed together
+- [x] Never log the need text or dependency names; the raw model output on rejection stays as
       it is (console only)
-- [ ] Errors log the step that failed and the reason in one line, not a stack trace for expected
+- [x] Errors log the step that failed and the reason in one line, not a stack trace for expected
       failures (rate limit, invalid input, rejected model output)
+- [x] Real run in the terminal ("A date picker component", React): five lines, 54.6s in total,
+      49.9s of it in AI call 2; an earlier run showed the failure line and the raw model output
 
 Tests: a successful request logs each step once with the same request ID; a failed step logs
 the step name and reason; the need text never appears in the log output.

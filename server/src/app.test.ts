@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from './app.js';
-import { claim, comparison, sourceResponse } from './fixtures.js';
+import { claim, comparison, sourceResponse, usage } from './fixtures.js';
 
 const clientDir = mkdtempSync(join(tmpdir(), 'client-dist-'));
 writeFileSync(join(clientDir, 'index.html'), '<div id="root"></div>');
@@ -61,7 +61,10 @@ function mockPipeline(answer: unknown = comparison(), openRouterStatus = 200) {
   const fetchMock = vi.fn(async (url: string) => {
     if (url.startsWith('https://openrouter.ai')) {
       const content = JSON.stringify([expansion, answer][aiCall++ % 2]);
-      return Response.json({ choices: [{ message: { content } }] }, { status: openRouterStatus });
+      return Response.json(
+        { choices: [{ message: { content } }], usage },
+        { status: openRouterStatus },
+      );
     }
     if (url.endsWith('/latest')) {
       return Response.json({ name: '@hookform/resolvers', version: '6.0.0' });
@@ -148,7 +151,8 @@ describe('POST /api/report', () => {
     expect(response.status).toBe(502);
     expect(response.body.error).toMatch(/OpenRouter request failed with status 500/);
     expect(aiCalls(fetchMock)).toBe(1);
-    expect(consoleError).toHaveBeenCalledTimes(1);
+    // There is no model output to log, only the failed step.
+    expect(consoleError).not.toHaveBeenCalled();
   });
 
   it('returns 429 after 10 requests in an hour', async () => {
@@ -161,5 +165,91 @@ describe('POST /api/report', () => {
 
     expect(response.status).toBe(429);
     expect(response.body.error).toMatch(/limit is 10 per hour/);
+  });
+});
+
+// Log lines as printed, with the request ID split off.
+function logLines() {
+  const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+  return () =>
+    consoleLog.mock.calls.map(([line]) => {
+      const [, id, text] = /^\[(\w+)\] (.*)$/s.exec(String(line))!;
+      return { id, text };
+    });
+}
+
+describe('POST /api/report logging', () => {
+  it('logs each step once with the same request ID', async () => {
+    const lines = logLines();
+    mockPipeline();
+    await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    const logged = lines();
+    expect(logged.map((l) => l.text)).toEqual([
+      'request received: framework React, 0 dependencies',
+      expect.stringMatching(
+        /^query_expansion done in \d+\.\ds: 166 prompt \+ 267 completion tokens, \$0\.00005$/,
+      ),
+      expect.stringMatching(/^data fetched for 1 candidates in \d+\.\ds; failed sources: none$/),
+      expect.stringMatching(/^comparison done in /),
+      expect.stringMatching(/^response sent: 200 in \d+\.\ds$/),
+    ]);
+    expect(new Set(logged.map((l) => l.id)).size).toBe(1);
+  });
+
+  it('gives each request its own ID', async () => {
+    const lines = logLines();
+    mockPipeline();
+    const app = createApp(clientDir);
+    await request(app).post('/api/report').send(reportBody);
+    await request(app).post('/api/report').send(reportBody);
+
+    expect(new Set(lines().map((l) => l.id)).size).toBe(2);
+  });
+
+  it('logs the failed step and the reason in one line', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const lines = logLines();
+    mockPipeline(
+      comparison({ ranking: [{ name: '@hookform/resolvers', reasons: [claim('npm.stars')] }] }),
+    );
+    await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    expect(lines().map((l) => l.text)).toContain(
+      'comparison failed: Model cited data that was not fetched: field @hookform/resolvers npm.stars',
+    );
+  });
+
+  it('logs invalid input and rate limits in one line each', async () => {
+    const lines = logLines();
+    mockPipeline();
+    const app = createApp(clientDir);
+    for (let i = 0; i < 11; i++) {
+      await request(app).post('/api/report').send({ need: '', framework: 'React' });
+    }
+
+    const texts = lines().map((l) => l.text);
+    expect(texts.filter((t) => t.startsWith('invalid input: '))).toHaveLength(10);
+    expect(texts.filter((t) => t === 'rate limited')).toHaveLength(1);
+  });
+
+  it('never logs the need text or dependency names', async () => {
+    const lines = logLines();
+    mockPipeline();
+    const need = 'a secret internal need';
+    await request(createApp(clientDir))
+      .post('/api/report')
+      .send({
+        need,
+        framework: 'React',
+        dependencies: [{ name: 'private-dep-name', range: '^1.0.0' }],
+      });
+
+    const output = lines()
+      .map((l) => l.text)
+      .join('\n');
+    expect(output).toContain('1 dependencies');
+    expect(output).not.toContain(need);
+    expect(output).not.toContain('private-dep-name');
   });
 });

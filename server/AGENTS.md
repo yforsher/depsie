@@ -58,8 +58,14 @@ failing the request.
   It takes the client build directory and serves it with SPA fallback; unknown `/api/` paths
   return 404.
 - `src/index.ts`: entry point; listens on `PORT` (default 3000) and serves `client/dist`.
+- `src/log.ts`: `log()` prints one line prefixed with the request ID, kept in an
+  `AsyncLocalStorage` set by the `requestLogging` middleware on `POST /api/report`, so pipeline
+  code can log without passing the ID around. Lines: request received, each AI call (duration,
+  tokens, cost), data fetched (failed sources), the failed step and reason, response sent (status,
+  total duration). Never the need text or dependency names.
 - `src/openrouter.ts`: `MODEL` (the one place the model ID is set) and `chatJson()`, which sends a
-  Zod schema as JSON Schema and validates the answer with it. Failures throw `AiError`.
+  Zod schema as JSON Schema and validates the answer with it. Failures throw `AiError`, which
+  carries the step name (`query_expansion` or `comparison`).
 - `src/candidates.ts`: `findCandidates()`, AI call 1. Model-named packages are resolved to their
   latest version (unknown names dropped), npm search results fill the rest, at most 5 returned.
 - `src/sources.ts`: one fetcher per outside source, each with a 10 second timeout. Fetchers

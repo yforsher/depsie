@@ -2,6 +2,7 @@ import express, { type ErrorRequestHandler } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { reportRequestSchema } from 'shared';
 import * as z from 'zod';
+import { log, requestLogging } from './log.js';
 import { AiError } from './openrouter.js';
 import { generateReport } from './report.js';
 
@@ -21,14 +22,22 @@ export function createApp(clientDir: string) {
     standardHeaders: 'draft-8',
     legacyHeaders: false,
     message: { error: `Too many reports: the limit is ${REPORTS_PER_HOUR} per hour.` },
+    handler: (_req, res, _next, options) => {
+      log('rate limited');
+      res.status(options.statusCode).json(options.message);
+    },
   });
 
-  app.post('/api/report', reportLimiter, express.json(), async (req, res) => {
+  app.post('/api/report', requestLogging, reportLimiter, express.json(), async (req, res) => {
     const parsed = reportRequestSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: z.prettifyError(parsed.error) });
+      const error = z.prettifyError(parsed.error);
+      log(`invalid input: ${error.replaceAll('\n', ' ')}`);
+      res.status(400).json({ error });
       return;
     }
+    const { framework, dependencies = [] } = parsed.data;
+    log(`request received: framework ${framework}, ${dependencies.length} dependencies`);
     res.json(await generateReport(parsed.data));
   });
 
@@ -47,7 +56,7 @@ export function createApp(clientDir: string) {
 
 const aiErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
   if (!(error instanceof AiError)) return next(error);
-  console.error(error.message);
+  log(`${error.step} failed: ${error.message}`);
   if (error.modelOutput) console.error(`Rejected model output: ${error.modelOutput}`);
   res.status(502).json({ error: `The AI step failed: ${error.message}` });
 };
