@@ -174,6 +174,18 @@ summary {
   display: block;
 }
 
+/* Claims link to their source page but read as text: a dotted underline, accent on hover. */
+.claim-link {
+  color: inherit;
+  text-decoration: underline dotted var(--text-muted);
+  text-underline-offset: 3px;
+}
+
+.claim-link:hover {
+  color: var(--accent-hover);
+  text-decoration-color: currentColor;
+}
+
 .evidence-list {
   margin: 8px 0 0;
   padding-left: 20px;
@@ -307,11 +319,34 @@ summary {
   font-size: 1.5rem;
 }
 
+/* On phone-width cards a 1.5rem name splits at its hyphens. */
+@container (max-width: 480px) {
+  .candidate.top h4 {
+    font-size: 1.25rem;
+  }
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+/* The rank keeps its own column so on narrow screens only the name and badge wrap, beside it. */
 .candidate-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 12px;
+}
+
+.candidate-title {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 12px;
+  gap: 4px 12px;
+}
+
+.candidate h4 {
+  overflow-wrap: anywhere;
 }
 
 .rank {

@@ -35,7 +35,14 @@ export function PrivacyNote() {
           </li>
           <li>
             The code is open source, so you can check all of this on{' '}
-            <a href="https://github.com/yforsher/dependency-decision">GitHub</a>.
+            <a
+              href="https://github.com/yforsher/dependency-decision"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              GitHub
+            </a>
+            .
           </li>
         </ul>
         <button type="button" onClick={() => dialog.current!.close()}>

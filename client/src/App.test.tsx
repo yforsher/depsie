@@ -46,8 +46,10 @@ describe('App', () => {
     const user = setup();
     await fillAndSubmit(user);
 
-    expect(await screen.findByRole('heading', { name: 'Recommendation' })).toBeInTheDocument();
-    expect(screen.getByText('A date picker (React), generated 2026-10-22')).toBeInTheDocument();
+    const title = await screen.findByRole('heading', { name: 'Recommendation' });
+    expect(title.nextElementSibling).toHaveTextContent(
+      'A date picker (React), generated Oct 22, 2026',
+    );
     expect(screen.getByRole('link', { name: 'react-day-picker@9.11.1' })).toBeInTheDocument();
     expect(sentBody(fetchMock)).toEqual({ need: 'A date picker', framework: 'React' });
   });

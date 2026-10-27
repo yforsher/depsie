@@ -87,7 +87,8 @@ label or icon, never color alone.
   `src/test-setup.ts` stubs `showModal()` and `close()`.
 - `src/components/ReportView.tsx`: one card per ranked candidate (the top pick marked
   Recommended) with its security facts, reasons and collapsed evidence; compact rejected
-  alternatives; data sources at the bottom.
+  alternatives; data sources at the bottom. Every reason and fact links to the web page of the
+  first field it cites; all report links open in a new tab. Dates show as "Oct 27, 2026" (UTC).
 - `src/index.css`: color tokens and all styles.
 - Tests sit next to the code as `*.test.ts(x)`; `src/test-setup.ts` registers jest-dom and
   cleanup.

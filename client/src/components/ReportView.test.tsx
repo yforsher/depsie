@@ -38,16 +38,35 @@ describe('ReportView', () => {
     );
     expect(rejected.getAllByText('Last release was published on 2020-03-27.')).not.toHaveLength(0);
 
-    expect(screen.getByRole('link', { name: 'OSV.dev' })).toBeInTheDocument();
-    expect(screen.getAllByText(/fetched 2026-10-22/)).toHaveLength(mockReport.sources.length);
+    const sources = within(screen.getByRole('heading', { name: 'Data sources' }).parentElement!);
+    const items = sources.getAllByRole('listitem');
+    expect(items).toHaveLength(mockReport.sources.length);
+    items.forEach((item) => expect(item).toHaveTextContent('fetched Oct 22, 2026'));
   });
 
-  it('shows evidence with package, field, source and fetch date', () => {
+  it('shows evidence with package, field, source and a readable fetch date', () => {
     render(<ReportView report={mockReport} />);
 
     expect(
-      screen.getAllByText('react-day-picker downloads.weekly, npm downloads API, 2026-10-22'),
+      screen.getAllByText('react-day-picker downloads.weekly, npm downloads API, Oct 22, 2026'),
     ).not.toHaveLength(0);
+  });
+
+  it('links claims and sources to their web pages in a new tab', () => {
+    render(<ReportView report={mockReport} />);
+
+    const reason = screen.getAllByRole('link', {
+      name: '6.1 million weekly downloads, the highest of the candidates.',
+    })[0]!;
+    expect(reason).toHaveAttribute('href', 'https://www.npmjs.com/package/react-day-picker');
+    expect(screen.getByRole('link', { name: 'OSV.dev' })).toHaveAttribute(
+      'href',
+      'https://osv.dev/list?ecosystem=npm&q=react-day-picker',
+    );
+    screen.getAllByRole('link').forEach((link) => {
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    });
   });
 
   it('labels every status with text, not only color', () => {

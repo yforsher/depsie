@@ -23,6 +23,8 @@ export interface EvidenceRef {
   package: string;
   field: string;
   source: string;
+  /** The web page where a person can see the same data. */
+  url: string;
   fetchedAt: string;
 }
 
@@ -62,6 +64,7 @@ export interface SecuritySummary {
 
 export interface DataSource {
   name: string;
+  /** The web page for the data, not the API response it was fetched from. */
   url: string;
   fetchedAt: string;
 }

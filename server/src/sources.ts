@@ -28,6 +28,19 @@ export const urls = {
     `https://cdn.jsdelivr.net/npm/${name}@${version}/README.md`,
 };
 
+// The human-readable page for each source's data, which the report links to instead of the
+// API response. The npm page also shows weekly downloads.
+export const pages = {
+  npm: (name: string, version: string) => `https://www.npmjs.com/package/${name}/v/${version}`,
+  dependencies: (name: string, version: string) =>
+    `https://deps.dev/npm/${encodeURIComponent(name)}/${version}`,
+  project: (repo: string) => `https://deps.dev/project/github/${encodeURIComponent(repo)}`,
+  osv: (name: string) => `https://osv.dev/list?ecosystem=npm&q=${encodeURIComponent(name)}`,
+  github: (repo: string) => `https://github.com/${repo}`,
+  readme: (name: string, version: string) =>
+    `https://www.jsdelivr.com/package/npm/${name}?version=${version}`,
+};
+
 export interface NpmData {
   description: string | null;
   license: string | null;

@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 describe('compareCandidates', () => {
-  it('fills in versions, ranks, sources and fetch dates from the fetched data', async () => {
+  it('fills in versions, ranks, sources, pages and fetch dates from the fetched data', async () => {
     const data = await packages();
     mockOpenRouter(comparison());
     const report = await compareCandidates(request, data);
@@ -43,6 +43,7 @@ describe('compareCandidates', () => {
                 package: NAME,
                 field: 'downloads.weekly',
                 source: 'npm downloads',
+                url: 'https://www.npmjs.com/package/@hookform/resolvers/v/6.0.0',
                 fetchedAt: data[0].downloads.fetchedAt,
               },
             ],
@@ -57,7 +58,7 @@ describe('compareCandidates', () => {
     expect(report.sources).toHaveLength(7);
     expect(report.sources).toContainEqual({
       name: `OSV for ${NAME}@6.0.0`,
-      url: 'https://api.osv.dev/v1/query',
+      url: 'https://osv.dev/list?ecosystem=npm&q=%40hookform%2Fresolvers',
       fetchedAt: data[0].vulnerabilities.fetchedAt,
     });
   });
@@ -96,7 +97,7 @@ describe('compareCandidates', () => {
 
   it('rejects a package name that was not fetched', async () => {
     const data = await packages();
-    mockOpenRouter(comparison({ rejected: [{ name: '...', reasons: [] }] }));
+    mockOpenRouter(comparison({ rejected: [{ name: '...', reasons: [claim('npm.license')] }] }));
     await expect(compareCandidates(request, data)).rejects.toThrow(
       'Model cited data that was not fetched: package ...',
     );
@@ -106,7 +107,7 @@ describe('compareCandidates', () => {
     const data = await packages();
     const answer = comparison({
       ranking: [{ name: NAME, reasons: [claim('npm...'), claim('npm.stars')] }],
-      rejected: [{ name: '...', reasons: [] }],
+      rejected: [{ name: '...', reasons: [claim('npm.license')] }],
     });
     mockOpenRouter(answer);
     const error = await compareCandidates(request, data).catch((e: unknown) => e);
@@ -135,6 +136,27 @@ describe('compareCandidates', () => {
     mockOpenRouter(
       comparison({ ranking: [{ name: NAME, reasons: [{ text: 'Popular.', evidence: [] }] }] }),
     );
+    await expect(compareCandidates(request, data)).rejects.toThrow(/does not match the schema/);
+  });
+
+  it('rejects an answer that leaves out a fetched package', async () => {
+    const data = await packages();
+    mockOpenRouter(comparison({ ranking: [], security: [] }));
+    await expect(compareCandidates(request, data)).rejects.toThrow(
+      `Model output is incomplete: ${NAME} is neither ranked nor rejected, ${NAME} has no security summary`,
+    );
+  });
+
+  it('rejects a package that is both ranked and rejected', async () => {
+    const data = await packages();
+    const entry = { name: NAME, reasons: [claim('npm.license')] };
+    mockOpenRouter(comparison({ ranking: [entry], rejected: [entry] }));
+    await expect(compareCandidates(request, data)).rejects.toThrow(`${NAME} is listed 2 times`);
+  });
+
+  it('rejects a ranked package without reasons', async () => {
+    const data = await packages();
+    mockOpenRouter(comparison({ ranking: [{ name: NAME, reasons: [] }] }));
     await expect(compareCandidates(request, data)).rejects.toThrow(/does not match the schema/);
   });
 });

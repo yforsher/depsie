@@ -3,7 +3,7 @@ import type { EvidenceRef, Report } from 'shared';
 const fetchedAt = '2026-10-22T09:00:00Z';
 
 function ref(pkg: string, field: string, source: string): EvidenceRef {
-  return { package: pkg, field, source, fetchedAt };
+  return { package: pkg, field, source, url: `https://www.npmjs.com/package/${pkg}`, fetchedAt };
 }
 
 export const mockReport: Report = {
@@ -120,6 +120,10 @@ export const mockReport: Report = {
   sources: [
     { name: 'npm registry', url: 'https://registry.npmjs.org', fetchedAt },
     { name: 'npm downloads API', url: 'https://api.npmjs.org/downloads', fetchedAt },
-    { name: 'OSV.dev', url: 'https://osv.dev', fetchedAt },
+    {
+      name: 'OSV.dev',
+      url: 'https://osv.dev/list?ecosystem=npm&q=react-day-picker',
+      fetchedAt,
+    },
   ],
 };

@@ -65,14 +65,18 @@ failing the request.
 - `src/sources.ts`: one fetcher per outside source, each with a 10 second timeout. Fetchers
   throw on any failure.
 - `src/packageData.ts`: `fetchPackageData()` runs the fetchers for one candidate and merges the
-  results into `PackageData`: one group per source with `source`, `url`, `fetchedAt` and either
-  `data` or `unavailable` (the reason). A failed source never fails the request.
+  results into `PackageData`: one group per source with `source`, `url` (the API called), `page`
+  (the web page for the same data, from `pages` in `sources.ts`), `fetchedAt` and either `data` or
+  `unavailable` (the reason). A failed source never fails the request. The report links to
+  `page`, never to the API response.
 - `src/report.ts`: `compareCandidates()`, AI call 2, and `generateReport()`, the whole pipeline.
   The prompt holds each package's source groups (data, or `unavailable` with the reason) with
   READMEs cut to 4,000 characters. The model cites `package` and `field` (`group.key`, for
   example `npm.license`); each reference is checked against those same fields, and source and
   fetch date are filled in from `PackageData`. Unknown packages or fields throw one `AiError`
-  listing all of them.
+  listing all of them. Every ranked or rejected entry needs at least one reason (schema), and every
+  fetched package must be ranked or rejected exactly once and have a security summary; otherwise
+  an `AiError` lists what is missing or repeated.
 - `AiError` carries the raw model output when the answer was rejected (not JSON, schema mismatch,
   invalid references).
 - `POST /api/report` in `src/app.ts`: rate limited to 10 per hour per IP (429), Zod validation

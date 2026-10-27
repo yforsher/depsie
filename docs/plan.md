@@ -188,8 +188,9 @@ Success criteria: need + framework in the browser produces a real report end to 
 - [x] Rejected alternatives shown compactly with their reasons; facts and evidence collapsed
 - [x] Clear visual hierarchy: the top recommendation stands out; status colors always keep a
       text label; data sources and fetch date at the bottom
-- [ ] Browser check with a real report: desktop done ("A date picker component", React); narrow
-      width not checked yet, the browser window could not be resized
+- [x] Browser check with a real report ("A date picker component", React) on desktop and at 390px
+      (in an iframe, since the browser window could not be resized): no horizontal scroll; the
+      rank now keeps its own column so the name and badge wrap beside it
 
 Tests: component tests for the empty, loading, error and report states; existing report
 rendering tests updated to the new layout.

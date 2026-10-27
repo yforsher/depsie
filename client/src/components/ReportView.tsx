@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type {
   CheckStatus,
   Claim,
@@ -30,7 +31,8 @@ export function ReportView({ report }: { report: Report }) {
       <header>
         <h2 id="report-title">Recommendation</h2>
         <p className="hint">
-          {report.need} ({report.framework}), generated {formatDate(report.generatedAt)}
+          {report.need} ({report.framework}), generated{' '}
+          <span className="nowrap">{formatDate(report.generatedAt)}</span>
         </p>
       </header>
 
@@ -67,7 +69,8 @@ export function ReportView({ report }: { report: Report }) {
         <ul>
           {report.sources.map((source) => (
             <li key={`${source.name} ${source.url}`}>
-              <a href={source.url}>{source.name}</a>, fetched {formatDate(source.fetchedAt)}
+              <ExternalLink href={source.url}>{source.name}</ExternalLink>, fetched{' '}
+              <span className="nowrap">{formatDate(source.fetchedAt)}</span>
             </li>
           ))}
         </ul>
@@ -89,10 +92,12 @@ function CandidateCard({ candidate, facts }: CardProps) {
         <span className="rank" aria-hidden="true">
           {candidate.rank}
         </span>
-        <h4>
-          <PackageName name={candidate.name} version={candidate.version} />
-        </h4>
-        {isTop && <span className="badge">Recommended</span>}
+        <div className="candidate-title">
+          <h4>
+            <PackageName name={candidate.name} version={candidate.version} />
+          </h4>
+          {isTop && <span className="badge">Recommended</span>}
+        </div>
       </div>
       {facts && <Facts summary={facts} />}
       <Reasons claims={candidate.reasons} />
@@ -122,12 +127,38 @@ function RejectedItem({ alternative, facts }: RejectedProps) {
   );
 }
 
+// Every link in the report leaves the app, so it opens in a new tab and keeps the report open.
+function ExternalLink({
+  href,
+  className,
+  children,
+}: {
+  href: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <a href={href} className={className} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  );
+}
+
+// A claim links to the page of the first field it cites; the evidence list has all of them.
+function ClaimText({ claim }: { claim: Claim }) {
+  return (
+    <ExternalLink href={claim.evidence[0]!.url} className="claim-link">
+      {claim.text}
+    </ExternalLink>
+  );
+}
+
 function PackageName({ name, version }: { name: string; version: string }) {
   return (
-    <a href={`https://www.npmjs.com/package/${name}/v/${version}`}>
+    <ExternalLink href={`https://www.npmjs.com/package/${name}/v/${version}`}>
       {name}
       <span className="version">@{version}</span>
-    </a>
+    </ExternalLink>
   );
 }
 
@@ -147,7 +178,7 @@ function Fact({ label, check }: { label: string; check: SecurityCheck }) {
       <dt>{label}</dt>
       <dd>
         <span className={`status status-${check.status}`}>{statusLabels[check.status]}</span>{' '}
-        {check.text}
+        <ClaimText claim={check} />
       </dd>
     </div>
   );
@@ -157,7 +188,9 @@ function Reasons({ claims }: { claims: Claim[] }) {
   return (
     <ul className="reasons">
       {claims.map((claim) => (
-        <li key={claim.text}>{claim.text}</li>
+        <li key={claim.text}>
+          <ClaimText claim={claim} />
+        </li>
       ))}
     </ul>
   );
@@ -180,9 +213,9 @@ function EvidenceList({ claims }: { claims: Claim[] }) {
         <li key={claim.text}>
           {claim.text}
           {claim.evidence.map((ref) => (
-            <span key={`${ref.package} ${ref.field}`} className="evidence">
+            <ExternalLink key={`${ref.package} ${ref.field}`} href={ref.url} className="evidence">
               {`${ref.package} ${ref.field}, ${ref.source}, ${formatDate(ref.fetchedAt)}`}
-            </span>
+            </ExternalLink>
           ))}
         </li>
       ))}
@@ -194,6 +227,14 @@ function factChecks(summary: SecuritySummary | undefined) {
   return summary ? factLabels.map(({ key }) => summary[key]) : [];
 }
 
+// "Oct 27, 2026". UTC so a fetch date never shifts a day with the viewer's time zone.
+const dateFormat = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+  timeZone: 'UTC',
+});
+
 function formatDate(iso: string) {
-  return iso.slice(0, 10);
+  return dateFormat.format(new Date(iso));
 }

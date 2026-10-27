@@ -12,7 +12,8 @@ const README_MAX_CHARS = 4000;
 const evidenceSchema = z.object({ package: z.string(), field: z.string() });
 const claimSchema = z.object({ text: z.string(), evidence: z.array(evidenceSchema).min(1) });
 const checkSchema = claimSchema.extend({ status: z.enum(['ok', 'warning', 'danger']) });
-const entrySchema = z.object({ name: z.string(), reasons: z.array(claimSchema) });
+// A ranking or rejection must cite data like any other claim, so it needs at least one reason.
+const entrySchema = z.object({ name: z.string(), reasons: z.array(claimSchema).min(1) });
 
 const comparisonSchema = z.object({
   ranking: z.array(entrySchema),
@@ -33,6 +34,7 @@ type ModelClaim = z.infer<typeof claimSchema>;
 
 const SYSTEM_PROMPT = `You compare npm packages for a developer's need, using only the package data given.
 Rank the packages that fit the need, best first, and list the others as rejected with the reasons.
+Each package goes in exactly one of the two lists: never both, never neither.
 Give a security and compliance summary for every package: license, known vulnerabilities,
 maintainers, dependency count and release activity, each with status ok, warning or danger.
 
@@ -121,12 +123,27 @@ function invalidReferences(comparison: Comparison, packages: Map<string, Package
   ];
 }
 
+// The prompt asks for every package to be ranked or rejected exactly once, each with a security
+// summary; an answer that skips or repeats packages is not a complete comparison.
+function missingCoverage(comparison: Comparison, packages: PackageData[]): string[] {
+  const listed = [...comparison.ranking, ...comparison.rejected].map((e) => e.name);
+  const summarized = new Set(comparison.security.map((s) => s.name));
+  return packages.flatMap(({ name }) => {
+    const times = listed.filter((n) => n === name).length;
+    return [
+      ...(times === 0 ? [`${name} is neither ranked nor rejected`] : []),
+      ...(times > 1 ? [`${name} is listed ${times} times`] : []),
+      ...(summarized.has(name) ? [] : [`${name} has no security summary`]),
+    ];
+  });
+}
+
 // References are already checked by invalidReferences(), so every lookup succeeds.
 function resolveClaim(claim: ModelClaim, packages: Map<string, PackageData>): Claim {
   const evidence = claim.evidence.map((ref) => {
     const [group] = ref.field.split('.', 1);
-    const { source, fetchedAt } = packages.get(ref.package)![group as Group];
-    return { package: ref.package, field: ref.field, source, fetchedAt };
+    const { source, page, fetchedAt } = packages.get(ref.package)![group as Group];
+    return { package: ref.package, field: ref.field, source, url: page, fetchedAt };
   });
   return { text: claim.text, evidence };
 }
@@ -170,7 +187,7 @@ function buildReport(
 function dataSources(pkg: PackageData): DataSource[] {
   return GROUPS.map((group) => ({
     name: `${pkg[group].source} for ${pkg.name}@${pkg.version}`,
-    url: pkg[group].url,
+    url: pkg[group].page,
     fetchedAt: pkg[group].fetchedAt,
   }));
 }
@@ -190,6 +207,13 @@ export async function compareCandidates(
   if (invalid.length > 0) {
     throw new AiError(
       `Model cited data that was not fetched: ${invalid.join(', ')}`,
+      JSON.stringify(comparison),
+    );
+  }
+  const missing = missingCoverage(comparison, packages);
+  if (missing.length > 0) {
+    throw new AiError(
+      `Model output is incomplete: ${missing.join(', ')}`,
       JSON.stringify(comparison),
     );
   }
