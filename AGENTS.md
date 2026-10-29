@@ -1,4 +1,4 @@
-## Business Requirements
+﻿## Business Requirements
 
 **User flow**
 This project is a tool that helps developers pick the right npm package for their needs.
@@ -50,26 +50,25 @@ No chat and no follow-up turns: each request makes a fixed, small number of AI c
 | ----------- | ------------------------------------------------------------------------------------- |
 | Client      | React, TypeScript, Vite, TanStack Query                                               |
 | Server      | Node, Express, TypeScript, Zod                                                        |
-| AI          | OpenRouter API (`openai/gpt-oss-120b`) with structured JSON output                    |
+| AI          | OpenRouter API (`openai/gpt-6-luna`) with structured JSON output                      |
 | Analytics   | Neon Postgres (free plan), one `events` table; country from a bundled GeoLite2 lookup |
 | Tests       | Vitest, React Testing Library, Supertest                                              |
 | Repo and CI | pnpm workspaces monorepo (`client/`, `server/`, `shared/`), GitHub Actions            |
 | Hosting     | One free tier host; the server serves the built client. Provider TBD                  |
 
-**Model: `openai/gpt-oss-120b`**, chosen for cost. Measured on real reports (2026-10-26):
+**Model: `openai/gpt-6-luna`**, chosen on 2026-10-29 from a comparison of 3 sample needs run 3
+times each (`docs/plan-done.md`, Part 12):
 
-- Pros: cheap (call 2 averages about $0.0007 and 6,500 prompt tokens with 5 candidates); supports
-  strict structured output through OpenRouter; a report takes about 30 seconds end to end.
-- Con, invalid references: some answers use a literal `...` as a package name or field (`...`,
-  `npm...`), 2 of 11 runs before the prompt change and 0 of 8 after. The server rejects these with
-  502 and logs the raw output; the cause is not proven yet.
-- Con, wording drift: the evidence check proves a cited field exists, not that the sentence says
-  only what it shows. Before the prompt listed words to avoid, 12% of claims added judgements
-  ("very active", "strong community adoption", "reduces attack surface") and 55% repeated field
-  paths in the text. After: 1% and 22%. Softer conclusions ("indicating recent activity", "a
-  small footprint") stayed at about 6%, so a list of words to avoid only reduces the problem.
-- If drift or failures stay too high, compare a more capable model on the same sample needs
-  before adding more prompt rules (see `docs/plan.md`, Part 12).
+- Typical report: 26 to 39 seconds (32s average), about $0.0023 ($0.10 / $0.50 per million input
+  / output tokens). Default OpenRouter routing; every run went to OpenAI, and the other providers
+  list the same price, so no provider setting is needed.
+- 0 of 9 runs failed, rank 1 was the same in all 3 runs of each need, and no claim contained a
+  field path, a status word or a judgement the data does not show.
+- Con: the same fact sometimes gets a different status between runs (6 facts across 9 runs).
+- Rejected: `openai/gpt-oss-120b` ($0.0012 but 18 to 107 seconds depending on the provider
+  OpenRouter picks, a timeout, field paths in 16% of claims; sorting providers by throughput did
+  not make it steady) and `anthropic/claude-haiku-5.5` (fewest status changes, 22 to 28 seconds,
+  but $0.0039 per report).
 
 - `client/`: form, local package.json filtering, preview, report view, export. See `client/AGENTS.md`.
 - `server/`: single `POST /api/report` endpoint, data fetching, AI calls. See `server/AGENTS.md`.

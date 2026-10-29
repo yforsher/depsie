@@ -16,7 +16,7 @@ The server is the only place that holds API keys (`OPENROUTER_API_KEY`, `GITHUB_
 
 ## AI usage
 
-OpenRouter with structured JSON output, validated with Zod. Model: `openai/gpt-oss-120b`. At most
+OpenRouter with structured JSON output, validated with Zod. Model: `openai/gpt-6-luna`. At most
 two AI calls per request and no retries: invalid model output or an OpenRouter error returns 502
 with a clear message.
 
@@ -73,7 +73,8 @@ failing the request.
   a SHA-256 hash of the IP with a salt kept in memory and replaced each UTC day; country comes
   from `geoip-country` (bundled GeoLite2 data, no outside call). Writes use the Neon HTTP driver,
   are not awaited and only log on failure, so analytics never delay or fail a response.
-- `src/openrouter.ts`: `MODEL` (the one place the model ID is set) and `chatJson()`, which sends a
+- `src/openrouter.ts`: `MODEL` (the one place the model ID is set; the optional `OPENROUTER_MODEL`
+  env variable overrides it for model comparison runs only) and `chatJson()`, which sends a
   Zod schema as JSON Schema and validates the answer with it. Output is capped at 8,000 tokens and each call times out after
   120 seconds; the log line names the provider that answered. Failures throw `AiError`, which
   carries the step name (`query_expansion` or `comparison`).

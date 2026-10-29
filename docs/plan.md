@@ -5,44 +5,8 @@ start the next part until the current part's success criteria pass and the user 
 
 Notes:
 
-- Finished parts move to `plan-done.md` (Parts 1 to 11 so far), with their measurements.
+- Finished parts move to `plan-done.md` (Parts 1 to 12 so far), with their measurements.
 - Fill in the code structure in `client/AGENTS.md` and `server/AGENTS.md` as each part is built.
-
-## Part 12: Model comparison
-
-After the Part 9 fixes, `openai/gpt-oss-120b` still ranks inconsistently (`qrcode.react` versus
-`react-qr-code` first for the same need), rates the same release date warning in one run and
-danger in another, writes bare facts as pros, puts field paths in cons and adds judgements to
-summaries. Some answers also ran on for 13,000 to 23,000 tokens until the Part 9 limits ended
-them. Compare it with stronger models before adding more prompt rules.
-
-Time and cost also depend on the provider OpenRouter picks for each request, since none is
-requested. AI call 2 is about 80% of a report (19s of 24s on 2026-10-29; the data fetch takes
-about 1s) and produces about 2,500 tokens every time, yet it took 5.1s on Crusoe, 19 to 20s on
-Parasail, 44.0s on DekaLLM and 73.5s on Near AI. Parasail charged $0.0024 for it, about 3 times
-the $0.0007 measured earlier.
-
-- [ ] Choose one or two candidate models with the user, from OpenRouter models that support
-      strict structured output, with their price per report
-- [ ] Make the model configurable for the comparison runs only (production keeps one fixed model)
-- [ ] Pick 3 sample needs, including the QR code need ("A React component to generate QR codes
-      for rendering to the DOM.", React)
-- [ ] Run each need 3 times on each model and save the outputs outside the repo
-- [ ] Compare per model: rejected or failed runs, whether rank 1 stays the same across runs,
-      whether the same fact gets the same status, rule breaks (pros that only restate a shown
-      fact, field paths, status words, judgements the data does not show), time and cost per report
-- [ ] Record the provider of every run, and compare time and cost per provider as well as per
-      model
-- [ ] Check the OpenRouter docs for provider routing (preferring speed or price, or naming the
-      providers), then test it on the chosen model: whether report time becomes steady and cost
-      stays low
-- [ ] Choose the model and provider settings with the user and record the results and the choice
-      in the `AGENTS.md` model section
-
-Tests: none new; the existing tests pass with the chosen model and provider settings.
-
-Success criteria: the user picks a model and provider settings from measured results on the same
-needs, and the decision, its typical report time and its cost are recorded in `AGENTS.md`.
 
 ## Part 13: Production deployment
 

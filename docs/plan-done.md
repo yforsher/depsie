@@ -332,3 +332,63 @@ dependencies.
 
 Success criteria: after a few real reports the user can see who used it (country), when, how
 often and at what cost, and the collected fields match the privacy section.
+
+## Part 12: Model comparison
+
+After the Part 9 fixes, `openai/gpt-oss-120b` still ranks inconsistently (`qrcode.react` versus
+`react-qr-code` first for the same need), rates the same release date warning in one run and
+danger in another, writes bare facts as pros, puts field paths in cons and adds judgements to
+summaries. Some answers also ran on for 13,000 to 23,000 tokens until the Part 9 limits ended
+them. Compare it with stronger models before adding more prompt rules.
+
+Time and cost also depend on the provider OpenRouter picks for each request, since none is
+requested. AI call 2 is about 80% of a report (19s of 24s on 2026-10-29; the data fetch takes
+about 1s) and produces about 2,500 tokens every time, yet it took 5.1s on Crusoe, 19 to 20s on
+Parasail, 44.0s on DekaLLM and 73.5s on Near AI. Parasail charged $0.0024 for it, about 3 times
+the $0.0007 measured earlier.
+
+- [x] Choose one or two candidate models with the user, from OpenRouter models that support
+      strict structured output, with their price per report. Chosen on 2026-10-29:
+      `anthropic/claude-haiku-5.5` and `openai/gpt-6-luna`, both $0.10 / $0.50 per million input
+      / output tokens, about $0.0023 per report at list price (8,000 prompt and 3,000 completion
+      tokens). `openai/gpt-oss-120b` lists at $0.15 / $0.60, about $0.003 per report.
+- [x] Make the model configurable for the comparison runs only (production keeps one fixed model):
+      the optional `OPENROUTER_MODEL` env variable overrides `MODEL` in `server/src/openrouter.ts`
+- [x] Pick 3 sample needs, including the QR code need ("A React component to generate QR codes
+      for rendering to the DOM.", React). The other two: "Validate form input with a schema and
+      show field errors" (React) and "Format and parse dates with time zones" (Node.js)
+- [x] Run each need 3 times on each model and save the outputs outside the repo
+      (`C:\Users\PC\dev\depwise-model-runs`, with the `compare.mts` and `summarize.mts` scripts)
+- [x] Compare per model: rejected or failed runs, whether rank 1 stays the same across runs,
+      whether the same fact gets the same status, rule breaks (pros that only restate a shown
+      fact, field paths, status words, judgements the data does not show), time and cost per report
+- [x] Record the provider of every run, and compare time and cost per provider as well as per
+      model
+
+  Results on 2026-10-29, 9 runs per model (rule breaks counted by pattern; the "avoided word"
+  hits for Haiku and Luna were all "README usage", not judgements):
+
+  | Model            | Failed | Rank 1 same | Facts with 2 statuses | Field paths | Pros restating | Judgements | Time avg (min-max) | Cost avg |
+  | ---------------- | ------ | ----------- | --------------------- | ----------- | -------------- | ---------- | ------------------ | -------- |
+  | gpt-oss-120b     | 1      | 3 of 3      | 6                     | 16%         | 13%            | 4%         | 53.5s (18-107s)    | $0.0012  |
+  | claude-haiku-5.5 | 0      | 3 of 3      | 2                     | 0%          | 2%             | 0%         | 24.9s (22-28s)     | $0.0039  |
+  | gpt-6-luna       | 0      | 3 of 3      | 6                     | 0%          | 0%             | 0%         | 31.8s (26-39s)     | $0.0023  |
+
+  gpt-oss-120b went to 6 providers: call 2 took 12s on Parasail ($0.0029) and 94s on DekaLLM
+  ($0.0007), and one run timed out at 120s. Haiku always ran on Azure and Luna on OpenAI.
+
+- [x] Check the OpenRouter docs for provider routing (preferring speed or price, or naming the
+      providers), then test it on the chosen model: whether report time becomes steady and cost
+      stays low. The `provider` object takes `sort` (`price`, `throughput` or `latency`), `order`
+      and `only`. Haiku and Luna list the same price on every provider and already ran steadily,
+      so routing was tested on gpt-oss-120b with `sort: "throughput"` (9 runs, 2026-10-29): still
+      5 to 102s (43.8s average), $0.0024 average, 2 failed (a 120s timeout and a repeated
+      package). Call 2 took 2.1s on Cerebras ($0.0040), 12.8s on Parasail and 79.8s on Near AI,
+      which OpenRouter still picked for 3 of 8 calls.
+- [x] Choose the model and provider settings with the user and record the results and the choice
+      in the `AGENTS.md` model section. Chosen: `openai/gpt-6-luna` with default routing
+
+Tests: none new; the existing tests pass with the chosen model and provider settings.
+
+Success criteria: the user picks a model and provider settings from measured results on the same
+needs, and the decision, its typical report time and its cost are recorded in `AGENTS.md`.

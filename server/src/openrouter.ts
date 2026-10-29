@@ -2,10 +2,12 @@ import * as z from 'zod';
 import { addUsage } from './analytics.js';
 import { log, secondsSince } from './log.js';
 
-export const MODEL = 'openai/gpt-oss-120b';
+// OPENROUTER_MODEL is set only for the model comparison runs; production leaves it unset.
+export const MODEL = process.env.OPENROUTER_MODEL ?? 'openai/gpt-6-luna';
 
 // A normal answer takes up to about 3,500 tokens (reasoning included) and 70 seconds. Broken
-// answers ran on for 13,000 to 23,000 tokens and up to 14 minutes, so both limits end them early.
+// gpt-oss-120b answers ran on for 13,000 to 23,000 tokens and up to 14 minutes, so both limits
+// end them early.
 const MAX_TOKENS = 8000;
 const TIMEOUT_MS = 120_000;
 
