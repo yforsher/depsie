@@ -5,6 +5,7 @@ import { AiError } from './openrouter.js';
 import { compareCandidates } from './report.js';
 
 const request = { need: 'validate forms', framework: 'React' as const };
+const signal = new AbortController().signal;
 const NAME = '@hookform/resolvers';
 
 async function packages(failing: string[] = []): Promise<PackageData[]> {
@@ -28,7 +29,7 @@ describe('compareCandidates', () => {
   it('fills in versions, ranks, sources, pages and fetch dates from the fetched data', async () => {
     const data = await packages();
     mockOpenRouter(comparison());
-    const report = await compareCandidates(request, data);
+    const report = await compareCandidates(request, data, signal);
 
     expect(report.ranking).toEqual([
       {
@@ -74,7 +75,7 @@ describe('compareCandidates', () => {
   it('writes every fact in code and takes only the status from the model', async () => {
     const data = await packages();
     mockOpenRouter(comparison());
-    const { security } = await compareCandidates(request, data);
+    const { security } = await compareCandidates(request, data, signal);
 
     expect(security[0].license).toEqual({
       text: 'MIT',
@@ -111,7 +112,7 @@ describe('compareCandidates', () => {
     if ('data' in pkg.vulnerabilities) pkg.vulnerabilities.data.known = [];
     if ('data' in pkg.npm) pkg.npm.data.maintainers = ['zpao'];
     mockOpenRouter(comparison());
-    const { security } = await compareCandidates(request, data);
+    const { security } = await compareCandidates(request, data, signal);
 
     expect(security[0].vulnerabilities).toMatchObject({ text: '0 known', status: 'ok' });
     expect(security[0].maintainers.text).toBe('zpao');
@@ -120,7 +121,7 @@ describe('compareCandidates', () => {
   it('shows a fact as unavailable when its source failed', async () => {
     const data = await packages(['osv', 'github', 'dependencies']);
     mockOpenRouter(comparison());
-    const report = await compareCandidates(request, data);
+    const report = await compareCandidates(request, data, signal);
 
     expect(report.security[0].vulnerabilities).toEqual({
       text: 'unavailable',
@@ -137,7 +138,7 @@ describe('compareCandidates', () => {
     const readme = data[0].readme;
     if ('data' in readme) readme.data.text = 'x'.repeat(10_000);
     const fetchMock = mockOpenRouter(comparison());
-    await compareCandidates(request, data);
+    await compareCandidates(request, data, signal);
 
     const body = JSON.parse(
       (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string,
@@ -151,7 +152,7 @@ describe('compareCandidates', () => {
   it('rejects a reference to a field that was not fetched', async () => {
     const data = await packages();
     mockOpenRouter(comparison({ ranking: [{ name: NAME, pros: [claim('npm.stars')], cons: [] }] }));
-    await expect(compareCandidates(request, data)).rejects.toThrow(
+    await expect(compareCandidates(request, data, signal)).rejects.toThrow(
       `Model cited data that was not fetched: field ${NAME} npm.stars`,
     );
   });
@@ -161,7 +162,9 @@ describe('compareCandidates', () => {
     mockOpenRouter(
       comparison({ ranking: [{ name: NAME, pros: [claim('npm.license', 'formik')], cons: [] }] }),
     );
-    await expect(compareCandidates(request, data)).rejects.toThrow(/field formik npm.license/);
+    await expect(compareCandidates(request, data, signal)).rejects.toThrow(
+      /field formik npm.license/,
+    );
   });
 
   it('rejects a package name that was not fetched', async () => {
@@ -169,7 +172,7 @@ describe('compareCandidates', () => {
     mockOpenRouter(
       comparison({ rejected: [{ name: '...', pros: [], cons: [claim('npm.license')] }] }),
     );
-    await expect(compareCandidates(request, data)).rejects.toThrow(
+    await expect(compareCandidates(request, data, signal)).rejects.toThrow(
       'Model cited data that was not fetched: package ...',
     );
   });
@@ -181,7 +184,7 @@ describe('compareCandidates', () => {
       rejected: [{ name: '...', pros: [], cons: [claim('npm.license')] }],
     });
     mockOpenRouter(answer);
-    const error = await compareCandidates(request, data).catch((e: unknown) => e);
+    const error = await compareCandidates(request, data, signal).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(AiError);
     expect((error as AiError).message).toBe(
@@ -195,13 +198,13 @@ describe('compareCandidates', () => {
     mockOpenRouter(
       comparison({ ranking: [{ name: NAME, pros: [claim('github.unavailable')], cons: [] }] }),
     );
-    const report = await compareCandidates(request, data);
+    const report = await compareCandidates(request, data, signal);
     expect(report.ranking[0].pros[0].evidence[0]).toMatchObject({ source: 'GitHub' });
 
     mockOpenRouter(
       comparison({ ranking: [{ name: NAME, pros: [claim('github.lastPush')], cons: [] }] }),
     );
-    await expect(compareCandidates(request, data)).rejects.toThrow(/github.lastPush/);
+    await expect(compareCandidates(request, data, signal)).rejects.toThrow(/github.lastPush/);
   });
 
   it('rejects a claim without evidence', async () => {
@@ -211,13 +214,15 @@ describe('compareCandidates', () => {
         ranking: [{ name: NAME, pros: [{ text: 'Popular.', evidence: [] }], cons: [] }],
       }),
     );
-    await expect(compareCandidates(request, data)).rejects.toThrow(/does not match the schema/);
+    await expect(compareCandidates(request, data, signal)).rejects.toThrow(
+      /does not match the schema/,
+    );
   });
 
   it('rejects an answer that leaves out a fetched package', async () => {
     const data = await packages();
     mockOpenRouter(comparison({ ranking: [], security: [] }));
-    await expect(compareCandidates(request, data)).rejects.toThrow(
+    await expect(compareCandidates(request, data, signal)).rejects.toThrow(
       `Model output is incomplete: ${NAME} is neither ranked nor rejected, ${NAME} has no security summary`,
     );
   });
@@ -226,7 +231,9 @@ describe('compareCandidates', () => {
     const data = await packages();
     const entry = { name: NAME, pros: [claim('npm.license')], cons: [claim('npm.license')] };
     mockOpenRouter(comparison({ ranking: [entry], rejected: [entry] }));
-    await expect(compareCandidates(request, data)).rejects.toThrow(`${NAME} is listed 2 times`);
+    await expect(compareCandidates(request, data, signal)).rejects.toThrow(
+      `${NAME} is listed 2 times`,
+    );
   });
 
   it('rejects a ranked package without a pro and a rejected one without a con', async () => {
@@ -234,7 +241,9 @@ describe('compareCandidates', () => {
     mockOpenRouter(
       comparison({ ranking: [{ name: NAME, pros: [], cons: [claim('npm.license')] }] }),
     );
-    await expect(compareCandidates(request, data)).rejects.toThrow(/does not match the schema/);
+    await expect(compareCandidates(request, data, signal)).rejects.toThrow(
+      /does not match the schema/,
+    );
 
     mockOpenRouter(
       comparison({
@@ -243,18 +252,22 @@ describe('compareCandidates', () => {
         summary: null,
       }),
     );
-    await expect(compareCandidates(request, data)).rejects.toThrow(/does not match the schema/);
+    await expect(compareCandidates(request, data, signal)).rejects.toThrow(
+      /does not match the schema/,
+    );
   });
 
   it('rejects a ranking without a summary, and checks the summary references', async () => {
     const data = await packages();
     mockOpenRouter(comparison({ summary: null }));
-    await expect(compareCandidates(request, data)).rejects.toThrow(
+    await expect(compareCandidates(request, data, signal)).rejects.toThrow(
       'Model output is incomplete: no summary for rank 1',
     );
 
     mockOpenRouter(comparison({ summary: claim('npm.stars') }));
-    await expect(compareCandidates(request, data)).rejects.toThrow(`field ${NAME} npm.stars`);
+    await expect(compareCandidates(request, data, signal)).rejects.toThrow(
+      `field ${NAME} npm.stars`,
+    );
   });
 
   it('accepts no summary when every package is rejected', async () => {
@@ -266,7 +279,7 @@ describe('compareCandidates', () => {
         summary: null,
       }),
     );
-    const report = await compareCandidates(request, data);
+    const report = await compareCandidates(request, data, signal);
     expect(report.summary).toBeNull();
     expect(report.rejected[0].cons).toHaveLength(1);
   });

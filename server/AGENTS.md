@@ -75,11 +75,15 @@ failing the request.
   are not awaited and only log on failure, so analytics never delay or fail a response.
 - `src/openrouter.ts`: `MODEL` (the one place the model ID is set; the optional `OPENROUTER_MODEL`
   env variable overrides it for model comparison runs only) and `chatJson()`, which sends a
-  Zod schema as JSON Schema and validates the answer with it. Output is capped at 8,000 tokens and each call times out after
-  120 seconds; the log line names the provider that answered. Failures throw `AiError`, which
+  Zod schema as JSON Schema and validates the answer with it. Output is capped at 8,000 tokens and both calls share
+  one 90 second deadline for the whole report (`AbortSignal` from `generateReport()`), so a slow
+  report ends with a clear 502 instead of leaving the user waiting; the log line names the provider that answered. Failures throw `AiError`, which
   carries the step name (`query_expansion` or `comparison`).
 - `src/candidates.ts`: `findCandidates()`, AI call 1. Model-named packages are resolved to their
   latest version (unknown names dropped), npm search results fill the rest, at most 5 returned.
+  Each npm request times out after 10 seconds; a failed or timed out request throws `NpmError`,
+  which the report endpoint maps to 502 with its message, since there is no report without
+  candidates.
 - `src/sources.ts`: one fetcher per outside source, each with a 10 second timeout. Fetchers
   throw on any failure.
 - `src/packageData.ts`: `fetchPackageData()` runs the fetchers for one candidate and merges the
@@ -102,6 +106,9 @@ failing the request.
   an `AiError` lists what is missing or repeated.
 - `AiError` carries the raw model output when the answer was rejected (not JSON, schema mismatch,
   invalid references).
+- `trust proxy` is `1`: the host's proxy (Cloud Run, see `docs/hosting.md`) appends the client IP
+  to `X-Forwarded-For`, so `req.ip` (used by the rate limit and analytics) is its last entry and a
+  client cannot fake it.
 - `POST /api/report` in `src/app.ts`: rate limited to 10 per hour per IP (429), Zod validation
   (400), then `generateReport()`; `AiError` becomes 502 with the message, and the rejected model
   output is logged to the console (never stored) so failures can be investigated.

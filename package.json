@@ -1,6 +1,7 @@
 {
-  "name": "dependency-decision",
+  "name": "depsie",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.33.1",
   "engines": {
@@ -11,6 +12,7 @@
     "format": "prettier --write .",
     "test": "pnpm -r test",
     "build": "pnpm -r build",
+    "start": "node server/dist/index.js",
     "dev": "pnpm -r --parallel dev"
   },
   "devDependencies": {

@@ -28,10 +28,23 @@ function userPrompt({ need, framework, dependencies }: ReportRequest): string {
   return lines.join('\n');
 }
 
+const TIMEOUT_MS = 10_000;
+
+// Without candidates there is no report, so unlike the package data sources an npm failure fails
+// the request; the report endpoint maps it to 502.
+export class NpmError extends Error {}
+
 async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(
+    (error: unknown) => {
+      if (error instanceof Error && error.name === 'TimeoutError') {
+        throw new NpmError(`The npm registry did not answer within ${TIMEOUT_MS / 1000}s`);
+      }
+      throw error;
+    },
+  );
   if (res.status === 404) return undefined;
-  if (!res.ok) throw new Error(`npm registry request failed with status ${res.status}: ${url}`);
+  if (!res.ok) throw new NpmError(`npm registry request failed with status ${res.status}: ${url}`);
   return res.json();
 }
 
@@ -49,12 +62,16 @@ async function search(keywords: string): Promise<Candidate[]> {
 
 // Model-named packages come first because they target the need directly; search results
 // fill the remaining slots and catch packages newer than the model's training data.
-export async function findCandidates(request: ReportRequest): Promise<Candidate[]> {
+export async function findCandidates(
+  request: ReportRequest,
+  signal: AbortSignal,
+): Promise<Candidate[]> {
   const { keywords, packages } = await chatJson(
     'query_expansion',
     expansionSchema,
     SYSTEM_PROMPT,
     userPrompt(request),
+    signal,
   );
   const [named, searched] = await Promise.all([
     Promise.all(packages.slice(0, MAX_CANDIDATES).map(resolveLatest)),

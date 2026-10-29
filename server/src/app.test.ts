@@ -170,6 +170,50 @@ describe('POST /api/report', () => {
     expect(consoleError).not.toHaveBeenCalled();
   });
 
+  it('gives both AI calls one deadline for the whole report', async () => {
+    const fetchMock = mockPipeline();
+    await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    const signals = fetchMock.mock.calls
+      .filter(([url]) => url.startsWith('https://openrouter.ai'))
+      .map(([, init]) => (init as RequestInit).signal);
+    expect(signals).toHaveLength(2);
+    expect(signals[0]).toBe(signals[1]);
+  });
+
+  it('returns 502 with a clear message when the report deadline passes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new DOMException('The operation timed out.', 'TimeoutError');
+      }),
+    );
+    const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    expect(response.status).toBe(502);
+    expect(response.body.error).toBe(
+      'The AI step failed: OpenRouter did not answer before the report deadline',
+    );
+  });
+
+  it('returns 502 with a clear message when the npm search does not answer', async () => {
+    const content = JSON.stringify({ keywords: ['form validation'], packages: [] });
+    // AI call 1 asks for a search, whose timeout fires.
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.startsWith('https://openrouter.ai')) {
+        return Response.json({ provider: 'DeepInfra', choices: [{ message: { content } }], usage });
+      }
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+      throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    expect(response.status).toBe(502);
+    expect(response.body.error).toBe('The npm registry did not answer within 10s');
+    expect(aiCalls(fetchMock)).toBe(1);
+  });
+
   it('returns 429 after 10 requests in an hour', async () => {
     mockPipeline();
     const app = createApp(clientDir);
@@ -180,6 +224,29 @@ describe('POST /api/report', () => {
 
     expect(response.status).toBe(429);
     expect(response.body.error).toMatch(/limit is 10 per hour/);
+  });
+
+  // The proxy appends the client IP to X-Forwarded-For; anything before it came from the client.
+  it('limits by the last X-Forwarded-For address, so a client cannot fake its IP', async () => {
+    mockPipeline();
+    const app = createApp(clientDir);
+    for (let i = 0; i < 10; i++) {
+      await request(app)
+        .post('/api/report')
+        .set('X-Forwarded-For', `10.0.0.${i}, 203.0.113.7`)
+        .send({});
+    }
+    const sameClient = await request(app)
+      .post('/api/report')
+      .set('X-Forwarded-For', '10.0.0.99, 203.0.113.7')
+      .send({});
+    const otherClient = await request(app)
+      .post('/api/report')
+      .set('X-Forwarded-For', '203.0.113.8')
+      .send({});
+
+    expect(sameClient.status).toBe(429);
+    expect(otherClient.status).toBe(400);
   });
 });
 

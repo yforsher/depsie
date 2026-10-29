@@ -3,6 +3,7 @@ import { rateLimit } from 'express-rate-limit';
 import { reportRequestSchema } from 'shared';
 import * as z from 'zod';
 import { recordVisit, reportAnalytics, setFramework } from './analytics.js';
+import { NpmError } from './candidates.js';
 import { log, requestLogging } from './log.js';
 import { AiError } from './openrouter.js';
 import { generateReport } from './report.js';
@@ -12,6 +13,10 @@ const REPORTS_PER_HOUR = 10;
 
 export function createApp(clientDir: string) {
   const app = express();
+  // In production the app runs behind one proxy that appends the client IP to X-Forwarded-For, so
+  // req.ip, used by the rate limit and analytics, is the last entry; earlier entries come from the
+  // client and are ignored.
+  app.set('trust proxy', 1);
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });
@@ -61,6 +66,7 @@ export function createApp(clientDir: string) {
   });
 
   app.use(aiErrorHandler);
+  app.use(npmErrorHandler);
 
   return app;
 }
@@ -70,4 +76,10 @@ const aiErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
   log(`${error.step} failed: ${error.message}`);
   if (error.modelOutput) console.error(`Rejected model output: ${error.modelOutput}`);
   res.status(502).json({ error: `The AI step failed: ${error.message}` });
+};
+
+const npmErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
+  if (!(error instanceof NpmError)) return next(error);
+  log(`npm search failed: ${error.message}`);
+  res.status(502).json({ error: error.message });
 };

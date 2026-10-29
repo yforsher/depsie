@@ -290,12 +290,14 @@ function dataSources(packages: PackageData[]): DataSource[] {
 export async function compareCandidates(
   request: ReportRequest,
   packages: PackageData[],
+  signal: AbortSignal,
 ): Promise<Report> {
   const comparison = await chatJson(
     'comparison',
     comparisonSchema,
     SYSTEM_PROMPT,
     userPrompt(request, packages),
+    signal,
   );
   const byName = new Map(packages.map((pkg) => [pkg.name, pkg]));
   const invalid = invalidReferences(comparison, byName);
@@ -317,15 +319,20 @@ export async function compareCandidates(
   return buildReport(request, packages, byName, comparison);
 }
 
+// A whole report takes 26 to 39 seconds. One deadline for both AI calls ends a slow report with a
+// clear 502 instead of leaving the user waiting.
+const REPORT_TIMEOUT_MS = 90_000;
+
 // The whole pipeline: exactly two AI calls, no retries, nothing stored.
 export async function generateReport(request: ReportRequest): Promise<Report> {
-  const candidates = await findCandidates(request);
+  const signal = AbortSignal.timeout(REPORT_TIMEOUT_MS);
+  const candidates = await findCandidates(request, signal);
   const start = performance.now();
   const packages = await Promise.all(candidates.map(fetchPackageData));
   log(
     `data fetched for ${packages.length} candidates in ${secondsSince(start)}; failed sources: ${failedSources(packages).join(', ') || 'none'}`,
   );
-  return compareCandidates(request, packages);
+  return compareCandidates(request, packages, signal);
 }
 
 function failedSources(packages: PackageData[]): string[] {

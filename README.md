@@ -1,4 +1,4 @@
-# dependency-decision
+# Depsie
 
 Helps developers pick the right npm package: describe the need, pick a framework, and get a ranked
 comparison of candidates grounded in fetched public data.

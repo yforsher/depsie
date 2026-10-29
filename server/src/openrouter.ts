@@ -5,11 +5,10 @@ import { log, secondsSince } from './log.js';
 // OPENROUTER_MODEL is set only for the model comparison runs; production leaves it unset.
 export const MODEL = process.env.OPENROUTER_MODEL ?? 'openai/gpt-6-luna';
 
-// A normal answer takes up to about 3,500 tokens (reasoning included) and 70 seconds. Broken
-// gpt-oss-120b answers ran on for 13,000 to 23,000 tokens and up to 14 minutes, so both limits
-// end them early.
+// A normal answer takes up to about 3,500 tokens (reasoning included). Broken gpt-oss-120b answers
+// ran on for 13,000 to 23,000 tokens and up to 14 minutes; the cap and the report deadline end them
+// early.
 const MAX_TOKENS = 8000;
-const TIMEOUT_MS = 120_000;
 
 // Thrown for OpenRouter failures and invalid model output; the report endpoint maps it to 502,
 // logs the step that failed and the raw model output, when there is one, so rejected answers can
@@ -25,12 +24,12 @@ export class AiError extends Error {
   }
 }
 
-// The timeout can fire while waiting for the headers or, since OpenRouter sends whitespace while
+// The report deadline can fire while waiting for the headers or, since OpenRouter sends whitespace while
 // the model works, while reading the body.
 function timedOut(name: string) {
   return (error: unknown): never => {
     if (error instanceof Error && error.name === 'TimeoutError') {
-      throw new AiError(name, `OpenRouter did not answer within ${TIMEOUT_MS / 1000}s`);
+      throw new AiError(name, 'OpenRouter did not answer before the report deadline');
     }
     throw error;
   };
@@ -47,11 +46,12 @@ export async function chatJson<T extends z.ZodType>(
   schema: T,
   system: string,
   user: string,
+  signal: AbortSignal,
 ): Promise<z.infer<T>> {
   const start = performance.now();
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal,
     headers: {
       Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
       'Content-Type': 'application/json',

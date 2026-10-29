@@ -42,11 +42,7 @@ export function PrivacyNote() {
           </li>
           <li>
             The code is open source, so you can check all of this on{' '}
-            <a
-              href="https://github.com/yforsher/dependency-decision"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <a href="https://github.com/yforsher/depsie" target="_blank" rel="noopener noreferrer">
               GitHub
             </a>
             .

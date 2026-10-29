@@ -12,7 +12,7 @@ export function App() {
       <header className="app-header">
         <h1>
           <img src="/logo.svg" alt="" />
-          Depwise
+          Depsie
         </h1>
         <p>Describe what you need and get a ranked, sourced comparison of npm packages.</p>
       </header>

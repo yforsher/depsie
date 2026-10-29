@@ -54,7 +54,7 @@ No chat and no follow-up turns: each request makes a fixed, small number of AI c
 | Analytics   | Neon Postgres (free plan), one `events` table; country from a bundled GeoLite2 lookup |
 | Tests       | Vitest, React Testing Library, Supertest                                              |
 | Repo and CI | pnpm workspaces monorepo (`client/`, `server/`, `shared/`), GitHub Actions            |
-| Hosting     | One free tier host; the server serves the built client. Provider TBD                  |
+| Hosting     | Google Cloud Run (one instance); the server serves the built client                   |
 
 **Model: `openai/gpt-6-luna`**, chosen on 2026-10-29 from a comparison of 3 sample needs run 3
 times each (`docs/plan-done.md`, Part 12):
