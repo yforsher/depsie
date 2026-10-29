@@ -37,19 +37,28 @@ export interface RankedCandidate {
   rank: number;
   name: string;
   version: string;
-  reasons: Claim[];
+  /** The GitHub repository page, or null when the npm metadata names none. */
+  repository: string | null;
+  /** The npm description, shown as written (no AI), or null when there is none. */
+  description: string | null;
+  pros: Claim[];
+  cons: Claim[];
 }
 
 export interface RejectedAlternative {
   name: string;
   version: string;
-  reasons: Claim[];
+  repository: string | null;
+  description: string | null;
+  pros: Claim[];
+  cons: Claim[];
 }
 
 export type CheckStatus = 'ok' | 'warning' | 'danger';
 
+/** A fact without a status (a count or a name) is shown as a neutral row. */
 export interface SecurityCheck extends Claim {
-  status: CheckStatus;
+  status?: CheckStatus;
 }
 
 export interface SecuritySummary {
@@ -60,6 +69,8 @@ export interface SecuritySummary {
   maintainers: SecurityCheck;
   dependencyCount: SecurityCheck;
   releaseActivity: SecurityCheck;
+  weeklyDownloads: SecurityCheck;
+  stars: SecurityCheck;
 }
 
 export interface DataSource {
@@ -73,6 +84,8 @@ export interface Report {
   need: string;
   framework: Framework;
   generatedAt: string;
+  /** Why the rank 1 package suits the need best; null when no package is ranked. */
+  summary: Claim | null;
   ranking: RankedCandidate[];
   rejected: RejectedAlternative[];
   security: SecuritySummary[];

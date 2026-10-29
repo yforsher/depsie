@@ -85,10 +85,15 @@ label or icon, never color alone.
   the privacy details in a native `<dialog>`. Keep the text in line with the privacy constraints
   in the root `AGENTS.md` whenever they change. jsdom lacks the dialog methods, so
   `src/test-setup.ts` stubs `showModal()` and `close()`.
-- `src/components/ReportView.tsx`: one card per ranked candidate (the top pick marked
-  Recommended) with its security facts, reasons and collapsed evidence; compact rejected
-  alternatives; data sources at the bottom. Every reason and fact links to the web page of the
-  first field it cites; all report links open in a new tab. Dates show as "Oct 27, 2026" (UTC).
+- `src/components/ReportView.tsx`: the summary of why the top pick was chosen ("Why <name>")
+  above the ranking, since it compares the top two; one card per ranked candidate (the top pick
+  marked Recommended, a GitHub badge when there is a repository, the npm description under the
+  name) with
+  its facts, then pros and cons; rejected alternatives show their cons, with pros and facts
+  collapsed; data sources at the bottom. Every fact, pro and con
+  ends with its sources, for example "(npm, OSV)". Only OSV and deps.dev are links, since the
+  package name already links to npm and the badge to GitHub; all report links open in a new tab.
+  Dates show as "Oct 27, 2026" (UTC).
 - `src/index.css`: color tokens and all styles.
 - Tests sit next to the code as `*.test.ts(x)`; `src/test-setup.ts` registers jest-dom and
   cleanup.

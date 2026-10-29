@@ -49,23 +49,18 @@ export function claim(field: string, pkg = NAME) {
   return { text: `About ${field}.`, evidence: [{ package: pkg, field }] };
 }
 
-function check(field: string) {
-  return { status: 'ok', ...claim(field) };
-}
-
 // A valid AI call 2 answer for the fixture package; `overrides` replaces top-level keys.
 export function comparison(overrides: Record<string, unknown> = {}) {
   return {
-    ranking: [{ name: NAME, reasons: [claim('downloads.weekly')] }],
+    ranking: [{ name: NAME, pros: [claim('downloads.weekly')], cons: [] }],
     rejected: [],
+    summary: claim('npm.description'),
     security: [
       {
         name: NAME,
-        license: check('npm.license'),
-        vulnerabilities: check('vulnerabilities.known'),
-        maintainers: check('npm.maintainers'),
-        dependencyCount: check('dependencies.total'),
-        releaseActivity: check('npm.versionReleaseDate'),
+        license: 'ok',
+        dependencyCount: 'ok',
+        releaseActivity: 'warning',
       },
     ],
     ...overrides,

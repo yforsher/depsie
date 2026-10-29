@@ -152,6 +152,8 @@ No known vulnerabilities: `{}` (no `vulns` key). Otherwise:
 ```
 
 `open_issues_count` includes open pull requests (8 here, where deps.dev reported 7 issues).
+Stars come from `stargazers_count` here, the live count; deps.dev's `starsCount` is a snapshot
+and is not used.
 
 `GET https://api.github.com/repos/<owner>/<repo>/commits?per_page=1` returns the latest commit on
 the default branch: `[{ sha, commit: { author: { date }, committer: { date } } }]`.
@@ -165,6 +167,8 @@ Without a token the limit is 60 requests per hour per IP (`X-RateLimit-Limit: 60
 published package files as plain text. Used only when npm's metadata has no README: for
 `cron@4.4.0`, npm's `readme` is `""` with no `readmeFilename`, while the package ships a 13 KB
 README.md. A package without that file returns 404.
+npm can also send the text `ERROR: No README data found!` as `readme` (`react-qr-generator@0.0.0`);
+that counts as no README too.
 
 ## Example: one `findCandidates()` run
 

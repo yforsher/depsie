@@ -164,35 +164,31 @@ summary {
   cursor: pointer;
 }
 
-.hint,
-.evidence {
+.hint {
   color: var(--text-muted);
   font-size: 0.875rem;
 }
 
-.evidence {
-  display: block;
+/* Where a claim comes from: secondary to the claim itself. */
+.source {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  white-space: nowrap;
 }
 
-/* Claims link to their source page but read as text: a dotted underline, accent on hover. */
-.claim-link {
-  color: inherit;
-  text-decoration: underline dotted var(--text-muted);
-  text-underline-offset: 3px;
+/* Secondary to the package name, which stays the main link. */
+.repo-badge {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  text-decoration: none;
 }
 
-.claim-link:hover {
+.repo-badge:hover {
+  border-color: var(--accent);
   color: var(--accent-hover);
-  text-decoration-color: currentColor;
-}
-
-.evidence-list {
-  margin: 8px 0 0;
-  padding-left: 20px;
-}
-
-.evidence-list li {
-  margin-bottom: 8px;
 }
 
 .preview {
@@ -213,6 +209,60 @@ summary {
 .reasons {
   margin: 0;
   padding-left: 20px;
+}
+
+.description {
+  margin: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.summary {
+  margin: 0 0 12px;
+  padding-left: 12px;
+  border-left: 3px solid var(--success);
+}
+
+.summary h4 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.summary p {
+  margin: 0;
+  color: var(--text);
+}
+
+/* Pros and cons side by side where a card is wide enough, stacked on phones. */
+.pros-cons {
+  display: grid;
+  gap: 8px 16px;
+}
+
+@container (min-width: 480px) {
+  .pros-cons {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  }
+}
+
+.pros-cons:empty {
+  display: none;
+}
+
+.claims h5 {
+  margin: 0 0 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+/* The heading is the text label, so the color is never the only signal. */
+.claims-pros h5 {
+  color: var(--success);
+}
+
+.claims-cons h5 {
+  color: var(--danger);
 }
 
 .cards {
@@ -377,10 +427,16 @@ summary {
   margin: 0;
 }
 
-/* Five facts read best as 3 + 2; auto-fit left a single orphan on the second row. */
+/* Seven facts read best as 4 + 3 where four columns fit their labels; 3 columns in between. */
 @container (min-width: 480px) {
   .facts {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container (min-width: 640px) {
+  .facts {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

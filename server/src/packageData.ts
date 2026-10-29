@@ -15,8 +15,7 @@ import {
   type Vulnerability,
 } from './sources.js';
 
-export type SourceName =
-  'npm registry' | 'npm downloads' | 'deps.dev' | 'OSV' | 'GitHub' | 'jsDelivr';
+export type SourceName = 'npm' | 'deps.dev' | 'OSV' | 'GitHub' | 'jsDelivr';
 
 // Every field in a group shares its source, URL, page and fetch date. `url` is the API that was
 // called; `page` is where a person can see the same data. A failed source keeps the same shape
@@ -69,8 +68,8 @@ function noRepo<T>(source: SourceName, name: string, version: string): SourceRes
 export async function fetchPackageData({ name, version }: Candidate): Promise<PackageData> {
   const npmPage = pages.npm(name, version);
   const [npm, downloads, dependencies, vulnerabilities] = await Promise.all([
-    settle('npm registry', urls.npm(name), npmPage, () => fetchNpm(name, version, new Date())),
-    settle('npm downloads', urls.downloads(name), npmPage, async () => ({
+    settle('npm', urls.npm(name), npmPage, () => fetchNpm(name, version, new Date())),
+    settle('npm', urls.downloads(name), npmPage, async () => ({
       weekly: await fetchWeeklyDownloads(name),
     })),
     settle(

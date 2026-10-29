@@ -81,10 +81,9 @@ describe('other fetchers', () => {
     );
   });
 
-  it('reads stars, issues and the scorecard', async () => {
+  it('reads issues and the scorecard', async () => {
     mockSources();
     await expect(fetchProject('react-hook-form/resolvers')).resolves.toEqual({
-      stars: 2263,
       openIssues: 0,
       scorecardScore: 5.3,
       scorecardDate: '2026-08-24T00:00:00Z',
@@ -110,10 +109,11 @@ describe('other fetchers', () => {
     await expect(fetchVulnerabilities('zod', '4.6.7')).resolves.toEqual([]);
   });
 
-  it('reads the last push and archived flag, sending the token when set', async () => {
+  it('reads stars, the last push and archived flag, sending the token when set', async () => {
     vi.stubEnv('GITHUB_TOKEN', 'test-token');
     const fetchMock = mockSources();
     await expect(fetchGithub('react-hook-form/resolvers')).resolves.toEqual({
+      stars: 2265,
       lastPush: '2026-10-24T22:51:50Z',
       archived: false,
     });

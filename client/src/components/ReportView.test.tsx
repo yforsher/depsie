@@ -17,18 +17,63 @@ describe('ReportView', () => {
     expect(within(cards[1]!).queryByText('Recommended')).not.toBeInTheDocument();
   });
 
-  it('shows key facts and reasons on each ranked card', () => {
+  it('shows key facts, pros and cons on the top card', () => {
     render(<ReportView report={mockReport} />);
 
     const top = screen.getByRole('link', { name: 'react-day-picker@9.11.1' }).closest('li')!;
+    expect(within(top).getByText('Customizable Date Picker for React')).toBeInTheDocument();
     expect(within(top).getByText('License')).toBeInTheDocument();
-    expect(within(top).getAllByText('No known vulnerabilities for 9.11.1.')).not.toHaveLength(0);
-    expect(
-      within(top).getAllByText('6.1 million weekly downloads, the highest of the candidates.'),
-    ).not.toHaveLength(0);
+    expect(within(top).getByText('Known vulnerabilities').nextSibling).toHaveTextContent(
+      'OK 0 known (OSV)',
+    );
+    expect(within(top).getByText('Maintainers').nextSibling).toHaveTextContent('gpbl (npm)');
+    expect(within(top).getByText('Weekly downloads').nextSibling).toHaveTextContent(
+      '6,104,220 (npm)',
+    );
+    expect(within(top).getByText('Stars').nextSibling).toHaveTextContent('6,512 (GitHub)');
+    expect(within(top).getByRole('heading', { name: 'Pros' }).nextSibling).toHaveTextContent(
+      '6.1 million weekly downloads, the most of the candidates. (npm)',
+    );
+    expect(within(top).getByRole('heading', { name: 'Cons' }).nextSibling).toHaveTextContent(
+      'Unpacked size 2.1 MB, the largest of the candidates. (npm)',
+    );
+    expect(within(top).queryByText('Evidence')).not.toBeInTheDocument();
   });
 
-  it('renders alternatives with their reason, and data sources', () => {
+  it('shows the summary above the cards, outside any card', () => {
+    render(<ReportView report={mockReport} />);
+
+    const summary = screen.getByRole('heading', { name: 'Why react-day-picker' }).parentElement!;
+    expect(summary).toHaveTextContent(
+      'Ships TypeScript types and declares react >=16.8.0 as its only peer dependency, with the most weekly downloads of the candidates. (npm)',
+    );
+    expect(summary.closest('li')).toBeNull();
+  });
+
+  it('shows counts and unavailable data on the second card', () => {
+    render(<ReportView report={mockReport} />);
+
+    const second = screen.getByRole('link', { name: 'react-datepicker@8.8.0' }).closest('li')!;
+    expect(within(second).getByText('Known vulnerabilities').nextSibling).toHaveTextContent(
+      'Risk 4 known (OSV)',
+    );
+    expect(within(second).getByText('Maintainers').nextSibling).toHaveTextContent('2 (npm)');
+    expect(within(second).getByText('Stars').nextSibling).toHaveTextContent('unavailable (GitHub)');
+  });
+
+  it('shows a GitHub badge only when the package has a repository', () => {
+    render(<ReportView report={mockReport} />);
+
+    const badges = screen
+      .getAllByRole('link', { name: 'GitHub' })
+      .filter((link) => link.closest('.candidate'));
+    expect(badges.map((badge) => badge.getAttribute('href'))).toEqual([
+      'https://github.com/gpbl/react-day-picker',
+      'https://github.com/react-dates/react-dates',
+    ]);
+  });
+
+  it('shows the cons of alternatives, with pros and facts collapsed, and data sources', () => {
     render(<ReportView report={mockReport} />);
 
     const rejected = within(screen.getByRole('region', { name: 'Alternatives considered' }));
@@ -36,32 +81,53 @@ describe('ReportView', () => {
       'href',
       'https://www.npmjs.com/package/react-dates/v/21.8.0',
     );
-    expect(rejected.getAllByText('Last release was published on 2020-03-27.')).not.toHaveLength(0);
+    const alternative = document.querySelector('.candidate.rejected')!;
+    const [cons, collapsed] = [
+      alternative.querySelector('.claims-cons')!,
+      alternative.querySelector('details')!,
+    ];
+    expect(cons.closest('details')).toBeNull();
+    expect(cons).toHaveTextContent('Peer dependency react ^0.14 || ^15.5.4 || ^16.1.1. (npm)');
+    expect(collapsed).not.toHaveAttribute('open');
+    expect(within(collapsed).getByText('Pros and facts')).toBeInTheDocument();
+    expect(collapsed).toHaveTextContent('Supports date range selection according to its README.');
 
     const sources = within(screen.getByRole('heading', { name: 'Data sources' }).parentElement!);
     const items = sources.getAllByRole('listitem');
-    expect(items).toHaveLength(mockReport.sources.length);
+    expect(items.map((item) => item.textContent)).toEqual([
+      'npm, fetched Oct 22, 2026',
+      'deps.dev, fetched Oct 22, 2026',
+      'OSV, fetched Oct 22, 2026',
+      'GitHub, fetched Oct 22, 2026',
+    ]);
     items.forEach((item) => expect(item).toHaveTextContent('fetched Oct 22, 2026'));
   });
 
-  it('shows evidence with package, field, source and a readable fetch date', () => {
+  it('links only the sources a card does not already link, in a new tab', () => {
     render(<ReportView report={mockReport} />);
 
+    const cardLinks = screen
+      .getAllByRole('link')
+      .filter((link) => link.closest('.candidate'))
+      .map((link) => link.textContent);
+    expect(new Set(cardLinks)).toEqual(
+      new Set([
+        'react-day-picker@9.11.1',
+        'react-datepicker@8.8.0',
+        'react-dates@21.8.0',
+        'GitHub',
+        'OSV',
+        'deps.dev',
+      ]),
+    );
     expect(
-      screen.getAllByText('react-day-picker downloads.weekly, npm downloads API, Oct 22, 2026'),
-    ).not.toHaveLength(0);
-  });
-
-  it('links claims and sources to their web pages in a new tab', () => {
-    render(<ReportView report={mockReport} />);
-
-    const reason = screen.getAllByRole('link', {
-      name: '6.1 million weekly downloads, the highest of the candidates.',
-    })[0]!;
-    expect(reason).toHaveAttribute('href', 'https://www.npmjs.com/package/react-day-picker');
-    expect(screen.getByRole('link', { name: 'OSV.dev' })).toHaveAttribute(
-      'href',
-      'https://osv.dev/list?ecosystem=npm&q=react-day-picker',
+      screen.queryByRole('link', { name: /weekly downloads, the most/ }),
+    ).not.toBeInTheDocument();
+    const osv = screen.getAllByRole('link', { name: 'OSV' })[0]!;
+    expect(osv).toHaveAttribute('href', 'https://osv.dev/list?ecosystem=npm&q=react-day-picker');
+    expect(osv).toHaveAttribute(
+      'title',
+      'react-day-picker vulnerabilities.known, fetched Oct 22, 2026',
     );
     screen.getAllByRole('link').forEach((link) => {
       expect(link).toHaveAttribute('target', '_blank');
@@ -73,7 +139,8 @@ describe('ReportView', () => {
     render(<ReportView report={mockReport} />);
 
     const statuses = document.querySelectorAll('.status');
-    expect(statuses).toHaveLength(mockReport.security.length * 5);
+    // License, vulnerabilities, dependencies and release activity; the rest are neutral.
+    expect(statuses).toHaveLength(mockReport.security.length * 4);
     statuses.forEach((status) => expect(status.textContent).toMatch(/^(OK|Caution|Risk)$/));
     expect(screen.getByText('Caution')).toBeInTheDocument();
   });

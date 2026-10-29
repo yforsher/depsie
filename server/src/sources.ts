@@ -54,7 +54,7 @@ export interface NpmData {
   firstReleaseDate: string;
   versionReleaseDate: string | null;
   releasesLastYear: number;
-  // Empty for some packages even when the published files include a README.
+  // Empty when npm has none, which happens even when the published files include a README.
   readme: string;
   // "owner/repo" from the repository field, when it points at GitHub.
   githubRepo: string | null;
@@ -85,6 +85,9 @@ export function parseGithubRepo(repository: Packument['repository']): string | n
   return match ? `${match[1]}/${match[2]}` : null;
 }
 
+// npm sends this text instead of an empty README when a package has none (react-qr-generator).
+const NPM_NO_README = 'ERROR: No README data found!';
+
 export async function fetchNpm(name: string, version: string, now: Date): Promise<NpmData> {
   const doc = (await getJson(urls.npm(name))) as Packument;
   const v = doc.versions[version];
@@ -106,7 +109,7 @@ export async function fetchNpm(name: string, version: string, now: Date): Promis
     versionReleaseDate: doc.time[version] ?? null,
     releasesLastYear: releaseDates.filter((date) => now.getTime() - Date.parse(date) < YEAR_MS)
       .length,
-    readme: doc.readme ?? '',
+    readme: doc.readme === NPM_NO_README ? '' : (doc.readme ?? ''),
     githubRepo: parseGithubRepo(doc.repository),
   };
 }
@@ -127,7 +130,6 @@ export async function fetchDependencyCount(name: string, version: string): Promi
 }
 
 export interface ProjectData {
-  stars: number;
   openIssues: number;
   scorecardScore: number | null;
   scorecardDate: string | null;
@@ -135,12 +137,10 @@ export interface ProjectData {
 
 export async function fetchProject(repo: string): Promise<ProjectData> {
   const data = (await getJson(urls.project(repo))) as {
-    starsCount: number;
     openIssuesCount: number;
     scorecard?: { overallScore: number; date: string };
   };
   return {
-    stars: data.starsCount,
     openIssues: data.openIssuesCount,
     scorecardScore: data.scorecard?.overallScore ?? null,
     scorecardDate: data.scorecard?.date ?? null,
@@ -178,6 +178,7 @@ export async function fetchVulnerabilities(
 }
 
 export interface GithubData {
+  stars: number;
   lastPush: string;
   archived: boolean;
 }
@@ -186,6 +187,6 @@ export async function fetchGithub(repo: string): Promise<GithubData> {
   const token = process.env.GITHUB_TOKEN;
   const data = (await getJson(urls.github(repo), {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
-  })) as { pushed_at: string; archived: boolean };
-  return { lastPush: data.pushed_at, archived: data.archived };
+  })) as { stargazers_count: number; pushed_at: string; archived: boolean };
+  return { stars: data.stargazers_count, lastPush: data.pushed_at, archived: data.archived };
 }

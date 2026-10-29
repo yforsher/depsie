@@ -75,7 +75,7 @@ function mockPipeline(answer: unknown = comparison(), openRouterStatus = 200) {
     if (url.startsWith('https://openrouter.ai')) {
       const content = JSON.stringify([expansion, answer][aiCall++ % 2]);
       return Response.json(
-        { choices: [{ message: { content } }], usage },
+        { provider: 'DeepInfra', choices: [{ message: { content } }], usage },
         { status: openRouterStatus },
       );
     }
@@ -145,7 +145,7 @@ describe('POST /api/report', () => {
   it('returns 502 without a retry when the model cites a field that was not fetched', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     const answer = comparison({
-      ranking: [{ name: '@hookform/resolvers', reasons: [claim('npm.stars')] }],
+      ranking: [{ name: '@hookform/resolvers', pros: [claim('npm.stars')], cons: [] }],
     });
     const fetchMock = mockPipeline(answer);
     const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
@@ -203,7 +203,7 @@ describe('POST /api/report logging', () => {
     expect(logged.map((l) => l.text)).toEqual([
       'request received: framework React, 0 dependencies',
       expect.stringMatching(
-        /^query_expansion done in \d+\.\ds: 166 prompt \+ 267 completion tokens, \$0\.00005$/,
+        /^query_expansion done in \d+\.\ds by DeepInfra: 166 prompt \+ 267 completion tokens, \$0\.00005$/,
       ),
       expect.stringMatching(/^data fetched for 1 candidates in \d+\.\ds; failed sources: none$/),
       expect.stringMatching(/^comparison done in /),
@@ -226,7 +226,9 @@ describe('POST /api/report logging', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const lines = logLines();
     mockPipeline(
-      comparison({ ranking: [{ name: '@hookform/resolvers', reasons: [claim('npm.stars')] }] }),
+      comparison({
+        ranking: [{ name: '@hookform/resolvers', pros: [claim('npm.stars')], cons: [] }],
+      }),
     );
     await request(createApp(clientDir)).post('/api/report').send(reportBody);
 

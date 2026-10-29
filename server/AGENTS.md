@@ -22,12 +22,13 @@ with a clear message.
 
 1. Query expansion: turn the need and framework into npm search keywords and candidate names. When
    provided, include the filtered public dependency names and declared version ranges as context.
-2. Grounded comparison: send only fetched public package data and READMEs. Ask for ranking,
-   reasons, rejected alternatives, and security and compliance per package. Data sources and fetch
+2. Grounded comparison: send only fetched public package data and READMEs. Ask for ranking, pros
+   and cons per package, a summary of why rank 1 suits the need, rejected alternatives, and security and compliance per package. Data sources and fetch
    dates are added in code from the fetched data, not by the model.
 
-Every evidence reference in the model output must point to a field fetched for that report;
-output with any other reference is rejected.
+Every evidence reference in the model output (pros, cons and the summary) must point to a field fetched for that
+report; output with any other reference is rejected. Security facts are written by code; the model
+only picks their status.
 
 ## Data sources
 
@@ -40,9 +41,9 @@ Every endpoint was verified by hand; response shapes and a real traced run are i
 | npm registry package metadata                          | Versions, release dates, license, maintainers, dependencies, peer dependencies, types, size, README |
 | npm downloads API (`api.npmjs.org/downloads`)          | Weekly downloads                                                                                    |
 | jsDelivr (`cdn.jsdelivr.net/npm`)                      | README.md from the published files, when npm's metadata has none                                    |
-| deps.dev API (Google Open Source Insights)             | Total dependency count, stars, open issues, OpenSSF Scorecard                                       |
+| deps.dev API (Google Open Source Insights)             | Total dependency count, open issues, OpenSSF Scorecard                                              |
 | OSV.dev API                                            | Known vulnerabilities per version                                                                   |
-| GitHub REST API (token needed for higher rate limits)  | Last push and archived flag (one call per package)                                                  |
+| GitHub REST API (token needed for higher rate limits)  | Stars, last push and archived flag (one call per package)                                           |
 
 A failed source (for example a GitHub rate limit) marks its fields as unavailable instead of
 failing the request.
@@ -73,7 +74,8 @@ failing the request.
   from `geoip-country` (bundled GeoLite2 data, no outside call). Writes use the Neon HTTP driver,
   are not awaited and only log on failure, so analytics never delay or fail a response.
 - `src/openrouter.ts`: `MODEL` (the one place the model ID is set) and `chatJson()`, which sends a
-  Zod schema as JSON Schema and validates the answer with it. Failures throw `AiError`, which
+  Zod schema as JSON Schema and validates the answer with it. Output is capped at 8,000 tokens and each call times out after
+  120 seconds; the log line names the provider that answered. Failures throw `AiError`, which
   carries the step name (`query_expansion` or `comparison`).
 - `src/candidates.ts`: `findCandidates()`, AI call 1. Model-named packages are resolved to their
   latest version (unknown names dropped), npm search results fill the rest, at most 5 returned.
@@ -89,7 +91,12 @@ failing the request.
   READMEs cut to 4,000 characters. The model cites `package` and `field` (`group.key`, for
   example `npm.license`); each reference is checked against those same fields, and source and
   fetch date are filled in from `PackageData`. Unknown packages or fields throw one `AiError`
-  listing all of them. Every ranked or rejected entry needs at least one reason (schema), and every
+  listing all of them. Every security fact is written by code from its fetched field (`codeFacts()`);
+  the model only picks the status of license, dependency count and release activity, and a failed
+  source shows as `unavailable` with no status. Each entry carries its GitHub repository page and its npm description (no AI), and
+  the data sources list has one entry per source that returned data, with its earliest fetch
+  date. A ranked entry needs at least one pro and a rejected one at least one con (schema), a ranking
+  needs a summary, and every
   fetched package must be ranked or rejected exactly once and have a security summary; otherwise
   an `AiError` lists what is missing or repeated.
 - `AiError` carries the raw model output when the answer was rejected (not JSON, schema mismatch,

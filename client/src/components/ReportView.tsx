@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type {
   CheckStatus,
   Claim,
+  EvidenceRef,
   RankedCandidate,
   RejectedAlternative,
   Report,
@@ -21,7 +22,13 @@ const factLabels: { key: keyof Omit<SecuritySummary, 'name' | 'version'>; label:
   { key: 'maintainers', label: 'Maintainers' },
   { key: 'dependencyCount', label: 'Dependencies' },
   { key: 'releaseActivity', label: 'Release activity' },
+  { key: 'weeklyDownloads', label: 'Weekly downloads' },
+  { key: 'stars', label: 'Stars' },
 ];
+
+// The package name already links to npm and the GitHub badge to the repository, so only the
+// sources a card does not otherwise link to get a link of their own.
+const linkedSources = new Set(['OSV', 'deps.dev']);
 
 export function ReportView({ report }: { report: Report }) {
   const facts = (name: string) => report.security.find((s) => s.name === name);
@@ -38,6 +45,15 @@ export function ReportView({ report }: { report: Report }) {
 
       <section aria-labelledby="ranking-title">
         <h3 id="ranking-title">Ranking</h3>
+        {/* The summary compares the top pick with the next one, so it sits above both cards. */}
+        {report.summary && report.ranking[0] && (
+          <div className="summary">
+            <h4>Why {report.ranking[0].name}</h4>
+            <p>
+              <ClaimText claim={report.summary} />
+            </p>
+          </div>
+        )}
         <ol className="cards">
           {report.ranking.map((candidate) => (
             <CandidateCard
@@ -96,12 +112,13 @@ function CandidateCard({ candidate, facts }: CardProps) {
           <h4>
             <PackageName name={candidate.name} version={candidate.version} />
           </h4>
+          <GithubBadge repository={candidate.repository} />
           {isTop && <span className="badge">Recommended</span>}
         </div>
       </div>
+      <Description text={candidate.description} />
       {facts && <Facts summary={facts} />}
-      <Reasons claims={candidate.reasons} />
-      <EvidenceDetails claims={[...candidate.reasons, ...factChecks(facts)]} />
+      <ProsCons pros={candidate.pros} cons={candidate.cons} />
     </li>
   );
 }
@@ -114,14 +131,19 @@ interface RejectedProps {
 function RejectedItem({ alternative, facts }: RejectedProps) {
   return (
     <li className="candidate rejected">
-      <h4>
-        <PackageName name={alternative.name} version={alternative.version} />
-      </h4>
-      <Reasons claims={alternative.reasons} />
+      <div className="candidate-title">
+        <h4>
+          <PackageName name={alternative.name} version={alternative.version} />
+        </h4>
+        <GithubBadge repository={alternative.repository} />
+      </div>
+      <Description text={alternative.description} />
+      {/* The cons say why it was rejected; the rest stays collapsed. */}
+      <ProsCons pros={[]} cons={alternative.cons} />
       <details>
-        <summary>Facts and evidence</summary>
+        <summary>Pros and facts</summary>
+        <ProsCons pros={alternative.pros} cons={[]} />
         {facts && <Facts summary={facts} />}
-        <EvidenceList claims={[...alternative.reasons, ...factChecks(facts)]} />
       </details>
     </li>
   );
@@ -131,26 +153,64 @@ function RejectedItem({ alternative, facts }: RejectedProps) {
 function ExternalLink({
   href,
   className,
+  title,
   children,
 }: {
   href: string;
   className?: string;
+  title?: string;
   children: ReactNode;
 }) {
   return (
-    <a href={href} className={className} target="_blank" rel="noopener noreferrer">
+    <a href={href} className={className} title={title} target="_blank" rel="noopener noreferrer">
       {children}
     </a>
   );
 }
 
-// A claim links to the page of the first field it cites; the evidence list has all of them.
+// A claim reads as plain text followed by its sources: "6.1 million weekly downloads (npm)".
 function ClaimText({ claim }: { claim: Claim }) {
   return (
-    <ExternalLink href={claim.evidence[0]!.url} className="claim-link">
-      {claim.text}
+    <>
+      {claim.text} <SourceLabels evidence={claim.evidence} />
+    </>
+  );
+}
+
+function SourceLabels({ evidence }: { evidence: EvidenceRef[] }) {
+  const bySource = new Map(evidence.map((ref) => [ref.source, ref]));
+  const labels = [...bySource.values()].map((ref, i) => (
+    <span key={ref.source}>
+      {i > 0 && ', '}
+      {linkedSources.has(ref.source) ? (
+        <ExternalLink
+          href={ref.url}
+          className="source-link"
+          title={`${ref.package} ${ref.field}, fetched ${formatDate(ref.fetchedAt)}`}
+        >
+          {ref.source}
+        </ExternalLink>
+      ) : (
+        ref.source
+      )}
+    </span>
+  ));
+  return <span className="source">({labels})</span>;
+}
+
+function GithubBadge({ repository }: { repository: string | null }) {
+  if (!repository) return null;
+  return (
+    <ExternalLink href={repository} className="repo-badge">
+      GitHub
     </ExternalLink>
   );
+}
+
+// The package's own npm description, as its author wrote it.
+function Description({ text }: { text: string | null }) {
+  if (!text) return null;
+  return <p className="description">{text}</p>;
 }
 
 function PackageName({ name, version }: { name: string; version: string }) {
@@ -174,57 +234,46 @@ function Facts({ summary }: { summary: SecuritySummary }) {
 
 function Fact({ label, check }: { label: string; check: SecurityCheck }) {
   return (
-    <div className={`fact fact-${check.status}`}>
+    <div className={check.status ? `fact fact-${check.status}` : 'fact'}>
       <dt>{label}</dt>
       <dd>
-        <span className={`status status-${check.status}`}>{statusLabels[check.status]}</span>{' '}
-        <ClaimText claim={check} />
+        {check.status && (
+          <>
+            <span className={`status status-${check.status}`}>
+              {statusLabels[check.status]}
+            </span>{' '}
+          </>
+        )}
+        {/* Fact values are short; kept whole so a date never breaks at its hyphens. */}
+        <span className="nowrap">{check.text}</span> <SourceLabels evidence={check.evidence} />
       </dd>
     </div>
   );
 }
 
-function Reasons({ claims }: { claims: Claim[] }) {
+function ProsCons({ pros, cons }: { pros: Claim[]; cons: Claim[] }) {
   return (
-    <ul className="reasons">
-      {claims.map((claim) => (
-        <li key={claim.text}>
-          <ClaimText claim={claim} />
-        </li>
-      ))}
-    </ul>
+    <div className="pros-cons">
+      <ClaimList title="Pros" claims={pros} />
+      <ClaimList title="Cons" claims={cons} />
+    </div>
   );
 }
 
-function EvidenceDetails({ claims }: { claims: Claim[] }) {
+function ClaimList({ title, claims }: { title: 'Pros' | 'Cons'; claims: Claim[] }) {
+  if (claims.length === 0) return null;
   return (
-    <details>
-      <summary>Evidence</summary>
-      <EvidenceList claims={claims} />
-    </details>
+    <div className={title === 'Pros' ? 'claims claims-pros' : 'claims claims-cons'}>
+      <h5>{title}</h5>
+      <ul className="reasons">
+        {claims.map((claim) => (
+          <li key={claim.text}>
+            <ClaimText claim={claim} />
+          </li>
+        ))}
+      </ul>
+    </div>
   );
-}
-
-// Each claim with the fetched fields it cites, so every sentence can be checked.
-function EvidenceList({ claims }: { claims: Claim[] }) {
-  return (
-    <ul className="evidence-list">
-      {claims.map((claim) => (
-        <li key={claim.text}>
-          {claim.text}
-          {claim.evidence.map((ref) => (
-            <ExternalLink key={`${ref.package} ${ref.field}`} href={ref.url} className="evidence">
-              {`${ref.package} ${ref.field}, ${ref.source}, ${formatDate(ref.fetchedAt)}`}
-            </ExternalLink>
-          ))}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function factChecks(summary: SecuritySummary | undefined) {
-  return summary ? factLabels.map(({ key }) => summary[key]) : [];
 }
 
 // "Oct 27, 2026". UTC so a fetch date never shifts a day with the viewer's time zone.

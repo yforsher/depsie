@@ -35,32 +35,101 @@ describe('compareCandidates', () => {
         rank: 1,
         name: NAME,
         version: '6.0.0',
-        reasons: [
+        repository: 'https://github.com/react-hook-form/resolvers',
+        description:
+          'React Hook Form validation resolvers: Yup, Joi, Superstruct, Zod, Vest, Class Validator, io-ts, Nope, computed-types, TypeBox, arktype, Typanion, Effect-TS and VineJS',
+        pros: [
           {
             text: 'About downloads.weekly.',
             evidence: [
               {
                 package: NAME,
                 field: 'downloads.weekly',
-                source: 'npm downloads',
+                source: 'npm',
                 url: 'https://www.npmjs.com/package/@hookform/resolvers/v/6.0.0',
                 fetchedAt: data[0].downloads.fetchedAt,
               },
             ],
           },
         ],
+        cons: [],
       },
     ]);
+    expect(report.summary).toMatchObject({
+      text: 'About npm.description.',
+      evidence: [{ field: 'npm.description', source: 'npm' }],
+    });
     expect(report.security[0].license).toMatchObject({
       status: 'ok',
-      evidence: [{ field: 'npm.license', source: 'npm registry' }],
+      evidence: [{ field: 'npm.license', source: 'npm' }],
     });
-    expect(report.sources).toHaveLength(7);
+    expect(report.sources.map((s) => s.name)).toEqual(['npm', 'deps.dev', 'OSV', 'GitHub']);
     expect(report.sources).toContainEqual({
-      name: `OSV for ${NAME}@6.0.0`,
-      url: 'https://osv.dev/list?ecosystem=npm&q=%40hookform%2Fresolvers',
+      name: 'OSV',
+      url: 'https://osv.dev',
       fetchedAt: data[0].vulnerabilities.fetchedAt,
     });
+  });
+
+  it('writes every fact in code and takes only the status from the model', async () => {
+    const data = await packages();
+    mockOpenRouter(comparison());
+    const { security } = await compareCandidates(request, data);
+
+    expect(security[0].license).toEqual({
+      text: 'MIT',
+      status: 'ok',
+      evidence: [expect.objectContaining({ field: 'npm.license', source: 'npm' })],
+    });
+    expect(security[0].dependencyCount).toMatchObject({
+      text: '1',
+      status: 'ok',
+      evidence: [{ field: 'dependencies.total', source: 'deps.dev' }],
+    });
+    expect(security[0].releaseActivity).toMatchObject({
+      text: '2026-10-19',
+      status: 'warning',
+      evidence: [{ field: 'npm.versionReleaseDate' }],
+    });
+
+    expect(security[0].vulnerabilities).toMatchObject({
+      text: '2 known',
+      status: 'danger',
+      evidence: [{ field: 'vulnerabilities.known', source: 'OSV' }],
+    });
+    expect(security[0].maintainers).toEqual({
+      text: '3',
+      evidence: [expect.objectContaining({ field: 'npm.maintainers', source: 'npm' })],
+    });
+    expect(security[0].weeklyDownloads.text).toBe('28,043,003');
+    expect(security[0].stars).toMatchObject({ text: '2,265', evidence: [{ source: 'GitHub' }] });
+  });
+
+  it('shows no vulnerabilities as OK and one maintainer by name', async () => {
+    const data = await packages();
+    const [pkg] = data;
+    if ('data' in pkg.vulnerabilities) pkg.vulnerabilities.data.known = [];
+    if ('data' in pkg.npm) pkg.npm.data.maintainers = ['zpao'];
+    mockOpenRouter(comparison());
+    const { security } = await compareCandidates(request, data);
+
+    expect(security[0].vulnerabilities).toMatchObject({ text: '0 known', status: 'ok' });
+    expect(security[0].maintainers.text).toBe('zpao');
+  });
+
+  it('shows a fact as unavailable when its source failed', async () => {
+    const data = await packages(['osv', 'github', 'dependencies']);
+    mockOpenRouter(comparison());
+    const report = await compareCandidates(request, data);
+
+    expect(report.security[0].vulnerabilities).toEqual({
+      text: 'unavailable',
+      evidence: [expect.objectContaining({ field: 'vulnerabilities.unavailable' })],
+    });
+    expect(report.security[0].stars.text).toBe('unavailable');
+    // The model's status is dropped: there is no value for it to describe.
+    expect(report.security[0].dependencyCount).not.toHaveProperty('status');
+    expect(report.sources.map((s) => s.name)).toEqual(['npm', 'deps.dev']);
   });
 
   it('sends only the fetched data, with the README shortened', async () => {
@@ -81,7 +150,7 @@ describe('compareCandidates', () => {
 
   it('rejects a reference to a field that was not fetched', async () => {
     const data = await packages();
-    mockOpenRouter(comparison({ ranking: [{ name: NAME, reasons: [claim('npm.stars')] }] }));
+    mockOpenRouter(comparison({ ranking: [{ name: NAME, pros: [claim('npm.stars')], cons: [] }] }));
     await expect(compareCandidates(request, data)).rejects.toThrow(
       `Model cited data that was not fetched: field ${NAME} npm.stars`,
     );
@@ -90,14 +159,16 @@ describe('compareCandidates', () => {
   it('rejects a reference to another package', async () => {
     const data = await packages();
     mockOpenRouter(
-      comparison({ ranking: [{ name: NAME, reasons: [claim('npm.license', 'formik')] }] }),
+      comparison({ ranking: [{ name: NAME, pros: [claim('npm.license', 'formik')], cons: [] }] }),
     );
     await expect(compareCandidates(request, data)).rejects.toThrow(/field formik npm.license/);
   });
 
   it('rejects a package name that was not fetched', async () => {
     const data = await packages();
-    mockOpenRouter(comparison({ rejected: [{ name: '...', reasons: [claim('npm.license')] }] }));
+    mockOpenRouter(
+      comparison({ rejected: [{ name: '...', pros: [], cons: [claim('npm.license')] }] }),
+    );
     await expect(compareCandidates(request, data)).rejects.toThrow(
       'Model cited data that was not fetched: package ...',
     );
@@ -106,8 +177,8 @@ describe('compareCandidates', () => {
   it('lists every invalid reference and keeps the raw model output', async () => {
     const data = await packages();
     const answer = comparison({
-      ranking: [{ name: NAME, reasons: [claim('npm...'), claim('npm.stars')] }],
-      rejected: [{ name: '...', reasons: [claim('npm.license')] }],
+      ranking: [{ name: NAME, pros: [claim('npm...'), claim('npm.stars')], cons: [] }],
+      rejected: [{ name: '...', pros: [], cons: [claim('npm.license')] }],
     });
     mockOpenRouter(answer);
     const error = await compareCandidates(request, data).catch((e: unknown) => e);
@@ -122,19 +193,23 @@ describe('compareCandidates', () => {
   it('accepts the reason for an unavailable source but not its data fields', async () => {
     const data = await packages(['github']);
     mockOpenRouter(
-      comparison({ ranking: [{ name: NAME, reasons: [claim('github.unavailable')] }] }),
+      comparison({ ranking: [{ name: NAME, pros: [claim('github.unavailable')], cons: [] }] }),
     );
     const report = await compareCandidates(request, data);
-    expect(report.ranking[0].reasons[0].evidence[0]).toMatchObject({ source: 'GitHub' });
+    expect(report.ranking[0].pros[0].evidence[0]).toMatchObject({ source: 'GitHub' });
 
-    mockOpenRouter(comparison({ ranking: [{ name: NAME, reasons: [claim('github.lastPush')] }] }));
+    mockOpenRouter(
+      comparison({ ranking: [{ name: NAME, pros: [claim('github.lastPush')], cons: [] }] }),
+    );
     await expect(compareCandidates(request, data)).rejects.toThrow(/github.lastPush/);
   });
 
   it('rejects a claim without evidence', async () => {
     const data = await packages();
     mockOpenRouter(
-      comparison({ ranking: [{ name: NAME, reasons: [{ text: 'Popular.', evidence: [] }] }] }),
+      comparison({
+        ranking: [{ name: NAME, pros: [{ text: 'Popular.', evidence: [] }], cons: [] }],
+      }),
     );
     await expect(compareCandidates(request, data)).rejects.toThrow(/does not match the schema/);
   });
@@ -149,14 +224,50 @@ describe('compareCandidates', () => {
 
   it('rejects a package that is both ranked and rejected', async () => {
     const data = await packages();
-    const entry = { name: NAME, reasons: [claim('npm.license')] };
+    const entry = { name: NAME, pros: [claim('npm.license')], cons: [claim('npm.license')] };
     mockOpenRouter(comparison({ ranking: [entry], rejected: [entry] }));
     await expect(compareCandidates(request, data)).rejects.toThrow(`${NAME} is listed 2 times`);
   });
 
-  it('rejects a ranked package without reasons', async () => {
+  it('rejects a ranked package without a pro and a rejected one without a con', async () => {
     const data = await packages();
-    mockOpenRouter(comparison({ ranking: [{ name: NAME, reasons: [] }] }));
+    mockOpenRouter(
+      comparison({ ranking: [{ name: NAME, pros: [], cons: [claim('npm.license')] }] }),
+    );
     await expect(compareCandidates(request, data)).rejects.toThrow(/does not match the schema/);
+
+    mockOpenRouter(
+      comparison({
+        ranking: [],
+        rejected: [{ name: NAME, pros: [claim('npm.license')], cons: [] }],
+        summary: null,
+      }),
+    );
+    await expect(compareCandidates(request, data)).rejects.toThrow(/does not match the schema/);
+  });
+
+  it('rejects a ranking without a summary, and checks the summary references', async () => {
+    const data = await packages();
+    mockOpenRouter(comparison({ summary: null }));
+    await expect(compareCandidates(request, data)).rejects.toThrow(
+      'Model output is incomplete: no summary for rank 1',
+    );
+
+    mockOpenRouter(comparison({ summary: claim('npm.stars') }));
+    await expect(compareCandidates(request, data)).rejects.toThrow(`field ${NAME} npm.stars`);
+  });
+
+  it('accepts no summary when every package is rejected', async () => {
+    const data = await packages();
+    mockOpenRouter(
+      comparison({
+        ranking: [],
+        rejected: [{ name: NAME, pros: [], cons: [claim('npm.license')] }],
+        summary: null,
+      }),
+    );
+    const report = await compareCandidates(request, data);
+    expect(report.summary).toBeNull();
+    expect(report.rejected[0].cons).toHaveLength(1);
   });
 });

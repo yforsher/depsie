@@ -2,27 +2,52 @@ import type { EvidenceRef, Report } from 'shared';
 
 const fetchedAt = '2026-10-22T09:00:00Z';
 
+const pages: Record<string, (pkg: string) => string> = {
+  npm: (pkg) => `https://www.npmjs.com/package/${pkg}`,
+  'deps.dev': (pkg) => `https://deps.dev/npm/${pkg}`,
+  OSV: (pkg) => `https://osv.dev/list?ecosystem=npm&q=${pkg}`,
+  GitHub: (pkg) => `https://github.com/example/${pkg}`,
+};
+
 function ref(pkg: string, field: string, source: string): EvidenceRef {
-  return { package: pkg, field, source, url: `https://www.npmjs.com/package/${pkg}`, fetchedAt };
+  return { package: pkg, field, source, url: pages[source]!(pkg), fetchedAt };
 }
 
 export const mockReport: Report = {
   need: 'A date picker',
   framework: 'React',
   generatedAt: '2026-10-22T09:00:05Z',
+  summary: {
+    text: 'Ships TypeScript types and declares react >=16.8.0 as its only peer dependency, with the most weekly downloads of the candidates.',
+    evidence: [
+      ref('react-day-picker', 'npm.types', 'npm'),
+      ref('react-day-picker', 'npm.peerDependencies', 'npm'),
+    ],
+  },
   ranking: [
     {
       rank: 1,
       name: 'react-day-picker',
       version: '9.11.1',
-      reasons: [
+      repository: 'https://github.com/gpbl/react-day-picker',
+      description: 'Customizable Date Picker for React',
+      pros: [
         {
-          text: '6.1 million weekly downloads, the highest of the candidates.',
-          evidence: [ref('react-day-picker', 'downloads.weekly', 'npm downloads API')],
+          text: '6.1 million weekly downloads, the most of the candidates.',
+          evidence: [ref('react-day-picker', 'downloads.weekly', 'npm')],
         },
         {
-          text: 'Declares react >=16.8.0 as a peer dependency.',
-          evidence: [ref('react-day-picker', 'peerDependencies', 'npm registry')],
+          text: 'Declares react >=16.8.0 as a peer dependency; no known vulnerabilities.',
+          evidence: [
+            ref('react-day-picker', 'npm.peerDependencies', 'npm'),
+            ref('react-day-picker', 'vulnerabilities.known', 'OSV'),
+          ],
+        },
+      ],
+      cons: [
+        {
+          text: 'Unpacked size 2.1 MB, the largest of the candidates.',
+          evidence: [ref('react-day-picker', 'npm.unpackedSize', 'npm')],
         },
       ],
     },
@@ -30,16 +55,20 @@ export const mockReport: Report = {
       rank: 2,
       name: 'react-datepicker',
       version: '8.8.0',
-      reasons: [
+      repository: null,
+      description: null,
+      pros: [
         {
-          text: '3.4 million weekly downloads.',
-          evidence: [ref('react-datepicker', 'downloads.weekly', 'npm downloads API')],
+          text: 'Includes a time picker according to its README.',
+          evidence: [ref('react-datepicker', 'readme.text', 'npm')],
         },
+      ],
+      cons: [
         {
-          text: 'Has 6 runtime dependencies against 1 for react-day-picker.',
+          text: 'Has 6 dependencies against 1 for react-day-picker.',
           evidence: [
-            ref('react-datepicker', 'dependencyCount', 'npm registry'),
-            ref('react-day-picker', 'dependencyCount', 'npm registry'),
+            ref('react-datepicker', 'dependencies.total', 'deps.dev'),
+            ref('react-day-picker', 'dependencies.total', 'deps.dev'),
           ],
         },
       ],
@@ -49,10 +78,18 @@ export const mockReport: Report = {
     {
       name: 'react-dates',
       version: '21.8.0',
-      reasons: [
+      repository: 'https://github.com/react-dates/react-dates',
+      description: 'A responsive and accessible date range picker component built with React',
+      pros: [
         {
-          text: 'Last release was published on 2020-03-27.',
-          evidence: [ref('react-dates', 'time.lastPublish', 'npm registry')],
+          text: 'Supports date range selection according to its README.',
+          evidence: [ref('react-dates', 'readme.text', 'npm')],
+        },
+      ],
+      cons: [
+        {
+          text: 'Peer dependency react ^0.14 || ^15.5.4 || ^16.1.1.',
+          evidence: [ref('react-dates', 'npm.peerDependencies', 'npm')],
         },
       ],
     },
@@ -64,27 +101,34 @@ export const mockReport: Report = {
       license: {
         status: 'ok',
         text: 'MIT',
-        evidence: [ref('react-day-picker', 'license', 'npm registry')],
+        evidence: [ref('react-day-picker', 'npm.license', 'npm')],
       },
       vulnerabilities: {
         status: 'ok',
-        text: 'No known vulnerabilities for 9.11.1.',
-        evidence: [ref('react-day-picker', 'vulns', 'OSV.dev')],
+        text: '0 known',
+        evidence: [ref('react-day-picker', 'vulnerabilities.known', 'OSV')],
       },
       maintainers: {
-        status: 'ok',
-        text: '2 maintainers.',
-        evidence: [ref('react-day-picker', 'maintainers', 'npm registry')],
+        text: 'gpbl',
+        evidence: [ref('react-day-picker', 'npm.maintainers', 'npm')],
       },
       dependencyCount: {
         status: 'ok',
-        text: '1 runtime dependency.',
-        evidence: [ref('react-day-picker', 'dependencyCount', 'npm registry')],
+        text: '1',
+        evidence: [ref('react-day-picker', 'dependencies.total', 'deps.dev')],
       },
       releaseActivity: {
         status: 'ok',
-        text: 'Last release on 2026-09-30.',
-        evidence: [ref('react-day-picker', 'time.lastPublish', 'npm registry')],
+        text: '2026-09-30',
+        evidence: [ref('react-day-picker', 'npm.versionReleaseDate', 'npm')],
+      },
+      weeklyDownloads: {
+        text: '6,104,220',
+        evidence: [ref('react-day-picker', 'downloads.weekly', 'npm')],
+      },
+      stars: {
+        text: '6,512',
+        evidence: [ref('react-day-picker', 'github.stars', 'GitHub')],
       },
     },
     {
@@ -93,37 +137,41 @@ export const mockReport: Report = {
       license: {
         status: 'ok',
         text: 'MIT',
-        evidence: [ref('react-datepicker', 'license', 'npm registry')],
+        evidence: [ref('react-datepicker', 'npm.license', 'npm')],
       },
       vulnerabilities: {
-        status: 'ok',
-        text: 'No known vulnerabilities for 8.8.0.',
-        evidence: [ref('react-datepicker', 'vulns', 'OSV.dev')],
+        status: 'danger',
+        text: '4 known',
+        evidence: [ref('react-datepicker', 'vulnerabilities.known', 'OSV')],
       },
       maintainers: {
-        status: 'warning',
-        text: '1 maintainer.',
-        evidence: [ref('react-datepicker', 'maintainers', 'npm registry')],
+        text: '2',
+        evidence: [ref('react-datepicker', 'npm.maintainers', 'npm')],
       },
       dependencyCount: {
-        status: 'ok',
-        text: '6 runtime dependencies.',
-        evidence: [ref('react-datepicker', 'dependencyCount', 'npm registry')],
+        status: 'warning',
+        text: '6',
+        evidence: [ref('react-datepicker', 'dependencies.total', 'deps.dev')],
       },
       releaseActivity: {
         status: 'ok',
-        text: 'Last release on 2026-08-12.',
-        evidence: [ref('react-datepicker', 'time.lastPublish', 'npm registry')],
+        text: '2026-08-12',
+        evidence: [ref('react-datepicker', 'npm.versionReleaseDate', 'npm')],
+      },
+      weeklyDownloads: {
+        text: '3,402,118',
+        evidence: [ref('react-datepicker', 'downloads.weekly', 'npm')],
+      },
+      stars: {
+        text: 'unavailable',
+        evidence: [ref('react-datepicker', 'github.unavailable', 'GitHub')],
       },
     },
   ],
   sources: [
-    { name: 'npm registry', url: 'https://registry.npmjs.org', fetchedAt },
-    { name: 'npm downloads API', url: 'https://api.npmjs.org/downloads', fetchedAt },
-    {
-      name: 'OSV.dev',
-      url: 'https://osv.dev/list?ecosystem=npm&q=react-day-picker',
-      fetchedAt,
-    },
+    { name: 'npm', url: 'https://www.npmjs.com', fetchedAt },
+    { name: 'deps.dev', url: 'https://deps.dev', fetchedAt },
+    { name: 'OSV', url: 'https://osv.dev', fetchedAt },
+    { name: 'GitHub', url: 'https://github.com', fetchedAt },
   ],
 };

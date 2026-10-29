@@ -12,7 +12,8 @@ No chat and no follow-up turns: each request makes a fixed, small number of AI c
 
 **Report contents**
 
-- Ranked candidates with the reasons for each position
+- Ranked candidates with pros and cons for each position, and a summary of why the top one was
+  chosen
 - Alternatives considered and why they were rejected
 - Security and compliance: license, known vulnerabilities, maintainers, dependency count, release activity
 - Data sources and the date the data was fetched
@@ -68,7 +69,7 @@ No chat and no follow-up turns: each request makes a fixed, small number of AI c
   paths in the text. After: 1% and 22%. Softer conclusions ("indicating recent activity", "a
   small footprint") stayed at about 6%, so a list of words to avoid only reduces the problem.
 - If drift or failures stay too high, compare a more capable model on the same sample needs
-  before adding more prompt rules (see `docs/plan.md`, TBD).
+  before adding more prompt rules (see `docs/plan.md`, Part 12).
 
 - `client/`: form, local package.json filtering, preview, report view, export. See `client/AGENTS.md`.
 - `server/`: single `POST /api/report` endpoint, data fetching, AI calls. See `server/AGENTS.md`.

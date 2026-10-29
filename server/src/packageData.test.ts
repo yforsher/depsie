@@ -14,7 +14,7 @@ describe('fetchPackageData README', () => {
     const data = await fetchPackageData(candidate);
 
     expect(data.readme).toMatchObject({
-      source: 'npm registry',
+      source: 'npm',
       data: { text: expect.stringContaining('React Hook Form') },
     });
     expect(data.npm).not.toHaveProperty('data.readme');
@@ -30,6 +30,14 @@ describe('fetchPackageData README', () => {
       url: 'https://cdn.jsdelivr.net/npm/@hookform/resolvers@6.0.0/README.md',
       data: { text: JSDELIVR_README },
     });
+  });
+
+  it("falls back to jsDelivr when npm's README is its no-README placeholder", async () => {
+    mockSources([], {
+      npm: { ...(fixture('npm') as object), readme: 'ERROR: No README data found!' },
+    });
+    const data = await fetchPackageData(candidate);
+    expect(data.readme).toMatchObject({ source: 'jsDelivr', data: { text: JSDELIVR_README } });
   });
 
   it('falls back to jsDelivr when npm fails', async () => {
@@ -57,19 +65,19 @@ describe('fetchPackageData', () => {
       name: '@hookform/resolvers',
       version: '6.0.0',
       npm: {
-        source: 'npm registry',
+        source: 'npm',
         url: 'https://registry.npmjs.org/@hookform/resolvers',
         data: { license: 'MIT' },
       },
-      downloads: { source: 'npm downloads', data: { weekly: 28043003 } },
+      downloads: { source: 'npm', data: { weekly: 28043003 } },
       dependencies: { source: 'deps.dev', data: { total: 1 } },
       project: {
         source: 'deps.dev',
         url: 'https://api.deps.dev/v3/projects/github.com%2Freact-hook-form%2Fresolvers',
-        data: { stars: 2263 },
+        data: { openIssues: 0 },
       },
       vulnerabilities: { source: 'OSV', data: { known: [{ id: 'GHSA-29mw-wpgm-hmr9' }, {}] } },
-      github: { source: 'GitHub', data: { archived: false } },
+      github: { source: 'GitHub', data: { stars: 2265, archived: false } },
     });
     for (const key of [
       'npm',
