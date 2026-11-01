@@ -23,7 +23,7 @@ packages (`Cannot find package 'express'`) and ran Node 26.
 | Request timeout   | Default 300 seconds, above the 90 second report deadline                                                                       |
 | Secrets           | `OPENROUTER_API_KEY`, `GITHUB_TOKEN`, `DATABASE_URL` (Neon `main` branch), from Secret Manager                                 |
 | Health check      | Startup probe on HTTP `/api/health`                                                                                            |
-| Budget alert      | In Cloud Billing, since pay-as-you-go has no hard cap                                                                          |
+| Budget alert      | 20 ILS a month, alerts at 50% and 100%, since pay-as-you-go has no hard cap                                                    |
 
 Cost: with minimum instances 0, usage at this traffic stays within Cloud Run's monthly allowance
 (240,000 vCPU-seconds and 450,000 GiB-seconds with instance-based billing). Minimum instances 1
@@ -31,8 +31,12 @@ adds about $8 to $10 a month. The OpenRouter key should be used only for this ap
 spending cap, so a leaked key can only cost a fixed amount.
 
 The client IP: Google's front end appends it as the last `X-Forwarded-For` entry, so Express
-`trust proxy` is `1` (community sources; confirm on the live URL that a spoofed `X-Forwarded-For`
-does not change the rate limit).
+`trust proxy` is `1`. Confirmed on the live URL: requests with different spoofed values shared
+one rate limit.
+
+Uptime: `.github/workflows/uptime.yml` calls `/api/health` every 6 hours, and GitHub emails when it
+fails. Cloud Monitoring uptime checks are not used: they run at least every 15 minutes, which would
+keep the instance up and billed all month.
 
 ## Sources
 
