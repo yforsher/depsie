@@ -401,7 +401,7 @@ needs, and the decision, its typical report time and its cost are recorded in `A
 - [x] Set `OPENROUTER_API_KEY`, `GITHUB_TOKEN` and `DATABASE_URL` (the Neon `main` branch, already
       in the local `.env` as `DATABASE_URL_PROD`; its `events` table exists) as host secrets
       (Secret Manager), never in the repo; a budget alert in Cloud Billing. Secrets attached to the
-      service; budget of 20 ILS a month, alerts at 50% and 100%
+      service; monthly budget alert set
 - [x] Build and start commands; `/api/health` as the host health check. Root `Dockerfile`, since
       the buildpack image had no server packages; deployed as `depsie-00008-qpk`, with a startup
       probe on `/api/health`
