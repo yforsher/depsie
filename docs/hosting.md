@@ -4,14 +4,15 @@ Chosen: Google Cloud Run. The database is Neon Postgres, outside the host.
 
 ## Cloud Run service settings
 
-Deploy with continuous deployment from GitHub (Cloud Build, Google Cloud Buildpacks). The Node.js
-buildpack installs with pnpm from `pnpm-lock.yaml`, runs the root `build` script, then starts the
-root `start` script (`node server/dist/index.js`), which reads the keys from environment variables
-instead of `.env`. Cloud Run sets `PORT` (8080).
+Deploy with continuous deployment from GitHub (Cloud Build). Cloud Build builds the root
+`Dockerfile`: Node 22, pnpm install, build, then production dependencies only. The container runs
+`node server/dist/index.js`, which reads the keys from environment variables instead of `.env`.
+Cloud Run sets `PORT` (8080). Buildpacks do not work here: the image they built had no server
+packages (`Cannot find package 'express'`) and ran Node 26.
 
 | Setting           | Value                                                                                                                          |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Source            | This GitHub repo, branch `master`; build type Google Cloud Buildpacks                                                          |
+| Source            | This GitHub repo, branch `master`; build type Dockerfile                                                                       |
 | Region            | A Tier 1 region (for example `europe-west1` or `us-central1`); Tier 2 costs about 1.4 times more                               |
 | Authentication    | Allow public access                                                                                                            |
 | Billing           | Instance-based, so the analytics writes after a response still get CPU (request-based billing gives CPU only during a request) |

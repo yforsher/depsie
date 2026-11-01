@@ -18,8 +18,8 @@ Notes:
       (Secret Manager), never in the repo; a budget alert in Cloud Billing
 - [ ] Build and start commands; `/api/health` as the host health check. Root `start` script added
       (`node server/dist/index.js`); a clean `pnpm build` then `pnpm start` serves `/api/health`
-      and the client locally. Left: the Cloud Run startup probe on `/api/health`, and confirm in
-      the first build log that the buildpack used pnpm and ran the root `build` and `start` scripts
+      and the client locally. Root `Dockerfile` added, since the buildpack image had no server
+      packages. Left: confirm the first Dockerfile deploy, and the startup probe on `/api/health`
 - [x] Set Express `trust proxy` to match the host's proxy, so the rate limit and the analytics
       country use the real client IP and a user cannot fake it with a header. Set to `1`: Google's
       front end appends the client IP as the last `X-Forwarded-For` entry. Confirm on the live URL
