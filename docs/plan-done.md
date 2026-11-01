@@ -1,6 +1,6 @@
 # Finished parts
 
-Parts 1 to 11 of `plan.md`, moved here once done. Kept for the measurements and decisions
+Parts 1 to 13 of `plan.md`, moved here once done. Kept for the measurements and decisions
 recorded along the way.
 
 ## Part 1: Plan
@@ -392,3 +392,37 @@ Tests: none new; the existing tests pass with the chosen model and provider sett
 
 Success criteria: the user picks a model and provider settings from measured results on the same
 needs, and the decision, its typical report time and its cost are recorded in `AGENTS.md`.
+
+## Part 13: Production deployment
+
+- [x] Choose a host with the user, comparing free tier and paid options; check its request timeout
+      fits a report of about 30 seconds. Chosen: Google Cloud Run (300 second default timeout, max
+      1 instance, instance-based billing); Neon stays the database. Settings in `docs/hosting.md`
+- [x] Set `OPENROUTER_API_KEY`, `GITHUB_TOKEN` and `DATABASE_URL` (the Neon `main` branch, already
+      in the local `.env` as `DATABASE_URL_PROD`; its `events` table exists) as host secrets
+      (Secret Manager), never in the repo; a budget alert in Cloud Billing. Secrets attached to the
+      service; budget of 20 ILS a month, alerts at 50% and 100%
+- [x] Build and start commands; `/api/health` as the host health check. Root `Dockerfile`, since
+      the buildpack image had no server packages; deployed as `depsie-00008-qpk`, with a startup
+      probe on `/api/health`
+- [x] Set Express `trust proxy` to match the host's proxy, so the rate limit and the analytics
+      country use the real client IP and a user cannot fake it with a header. Set to `1`: Google's
+      front end appends the client IP as the last `X-Forwarded-For` entry. Confirmed on the live
+      URL: requests with different spoofed `X-Forwarded-For` values shared one limit and reached 429
+- [x] One 90 second deadline shared by both AI calls (replaces the 120 second per-call timeout),
+      so a slow report gets a clear 502 instead of leaving the user waiting
+- [x] Timeout on the npm search, which has none today, so a stuck call returns a clear error
+      instead of hanging until the host cuts the request (the OpenRouter calls got theirs in Part 9).
+      10 seconds, like the other sources; a failed npm request now returns 502 with its message
+      instead of Express's default 500
+- [x] Spending cap on the OpenRouter key in the OpenRouter dashboard, as a hard cost limit across
+      all IPs
+- [x] `LICENSE` file (MIT unless the user chooses otherwise). MIT, copyright 2026 Jonas
+- [x] Real report on the live URL in the browser. A real `POST /api/report` returned 200 in 50.4
+      seconds with all sources fetched, the analytics rows reached Neon, and it works in the browser
+
+Tests: the rate limit uses the client IP from the proxy header set by the host; a timed out
+OpenRouter call returns 502 with a clear message.
+
+Success criteria: the live URL produces a real report end to end; secrets are only in the host
+settings; the OpenRouter cap is active.
