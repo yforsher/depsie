@@ -3,6 +3,11 @@
 Helps developers pick the right npm package: describe the need, pick a framework, and get a ranked
 comparison of candidates grounded in fetched public data.
 
+Live at https://depsie.cloud.run
+
+An LLM finds the candidates, then compares and ranks them using only public data fetched for each
+report, citing that data for its claims.
+
 ## Run
 
 Requires Node 22+ and pnpm.
@@ -31,11 +36,13 @@ framework, status, and AI tokens and cost. Unique visitors per day come from a h
 salt that is replaced daily and never stored. No cookies, no IP addresses, and never the need text,
 dependency names or the report. See `server/sql/schema.sql`.
 
-This product includes GeoLite2 data created by MaxMind, available from https://www.maxmind.com.
-
 ## Test
 
 ```sh
 pnpm lint
 pnpm test
 ```
+
+## License
+
+MIT. See `LICENSE`.
