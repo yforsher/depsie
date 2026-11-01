@@ -23,7 +23,7 @@ packages (`Cannot find package 'express'`) and ran Node 26.
 | Request timeout   | Default 300 seconds, above the 90 second report deadline                                                                       |
 | Secrets           | `OPENROUTER_API_KEY`, `GITHUB_TOKEN`, `DATABASE_URL` (Neon `main` branch), from Secret Manager                                 |
 | Health check      | Startup probe on HTTP `/api/health`                                                                                            |
-| Budget alert      | 20 ILS a month, alerts at 50% and 100%, since pay-as-you-go has no hard cap                                                    |
+| Budget alert      | Monthly alert in Cloud Billing, since pay-as-you-go has no hard cap                                                            |
 
 Cost: with minimum instances 0, usage at this traffic stays within Cloud Run's monthly allowance
 (240,000 vCPU-seconds and 450,000 GiB-seconds with instance-based billing). Minimum instances 1
