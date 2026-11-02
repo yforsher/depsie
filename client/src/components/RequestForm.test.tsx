@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
-import { RequestForm } from './RequestForm';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import needExamples from '../needExamples.json';
+import { maxNeedLength, RequestForm } from './RequestForm';
 
 type User = ReturnType<typeof userEvent.setup>;
 
@@ -30,6 +31,40 @@ const mixedManifest = JSON.stringify({
 function submit(user: User) {
   return user.click(screen.getByRole('button', { name: 'Get recommendation' }));
 }
+
+describe('need examples', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('has 40 unique examples within the need limit', () => {
+    expect(new Set(needExamples).size).toBe(40);
+    expect(needExamples.every((example) => example.length <= maxNeedLength)).toBe(true);
+  });
+
+  it.each([
+    [0, needExamples[0]],
+    [0.999, needExamples[needExamples.length - 1]],
+  ])('shows the example picked by a random value of %d', (random, example) => {
+    vi.spyOn(Math, 'random').mockReturnValue(random);
+    setup();
+
+    expect(screen.getByLabelText('What do you need?')).toHaveAttribute('placeholder', example);
+  });
+
+  it('keeps the same example while typing', async () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { user } = setup();
+    random.mockReturnValue(0.999);
+
+    await user.type(screen.getByLabelText('What do you need?'), 'A');
+
+    expect(screen.getByLabelText('What do you need?')).toHaveAttribute(
+      'placeholder',
+      needExamples[0],
+    );
+  });
+});
 
 describe('RequestForm', () => {
   it('disables submit until both the need and framework are filled in', async () => {

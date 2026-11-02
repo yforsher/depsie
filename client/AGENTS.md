@@ -80,6 +80,7 @@ label or icon, never color alone.
 - `src/components/RequestForm.tsx`: need, framework, optional package.json, extra scopes,
   validation (need at most 500 characters, at most 200 dependencies).
   Enter in the need or framework field submits once both are filled; Shift+Enter adds a line.
+  The need placeholder is picked at random on page load from `src/needExamples.json`.
 - `src/components/SentPreview.tsx`: the "what is sent" preview, including entries not sent.
 - `src/components/PrivacyNote.tsx`: a "How your data is handled" link under the preview that opens
   the privacy details in a native `<dialog>`. Keep the text in line with the privacy constraints

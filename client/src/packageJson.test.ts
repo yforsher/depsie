@@ -54,6 +54,15 @@ describe('filterDependencies', () => {
     expect(result.sent).toHaveLength(1);
   });
 
+  it.each([
+    '@nuxtjs/tailwindcss',
+    '@react-native-community/netinfo',
+    '@solid-primitives/storage',
+    '@solidjs/router',
+  ])('sends %s', (name) => {
+    expect(filterDependencies([{ name, range: '^1.0.0' }]).sent).toHaveLength(1);
+  });
+
   it('skips scoped packages whose scope is not allowed', () => {
     const result = filterDependencies([{ name: '@acme/internal-ui', range: '^1.0.0' }]);
 

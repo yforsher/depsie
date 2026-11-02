@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react';
 import { frameworks, type Framework, type ReportRequest } from 'shared';
+import needExamples from '../needExamples.json';
 import { filterDependencies, parsePackageJson, parseScopes } from '../packageJson';
 import { SentPreview } from './SentPreview';
 
@@ -17,6 +18,8 @@ export function RequestForm({ onSubmit, isPending }: Props) {
   const [packageJson, setPackageJson] = useState('');
   const [extraScopes, setExtraScopes] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
+  // In state so the example is picked once, not on every keystroke.
+  const [needExample] = useState(randomNeedExample);
 
   const parsed = readPackageJson(packageJson);
   const filtered = filterDependencies(parsed.dependencies, parseScopes(extraScopes));
@@ -49,11 +52,11 @@ export function RequestForm({ onSubmit, isPending }: Props) {
       <label htmlFor="need">What do you need?</label>
       <textarea
         id="need"
-        rows={3}
+        rows={4}
         value={need}
         onChange={(e) => setNeed(e.target.value)}
         onKeyDown={handleEnter}
-        placeholder="A date picker with range selection and keyboard support"
+        placeholder={needExample}
       />
       <p className="hint">
         {need.length}/{maxNeedLength} characters. Enter submits, Shift+Enter adds a line.
@@ -117,6 +120,10 @@ export function RequestForm({ onSubmit, isPending }: Props) {
       </button>
     </form>
   );
+}
+
+function randomNeedExample() {
+  return needExamples[Math.floor(Math.random() * needExamples.length)];
 }
 
 function readPackageJson(text: string) {
