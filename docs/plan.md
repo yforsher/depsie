@@ -5,10 +5,10 @@ start the next part until the current part's success criteria pass and the user 
 
 Notes:
 
-- Finished parts move to `plan-done.md` (Parts 1 to 13 so far), with their measurements.
+- Finished parts move to `plan-done.md` (Parts 1 to 14 so far), with their measurements.
 - Fill in the code structure in `client/AGENTS.md` and `server/AGENTS.md` as each part is built.
 
-## Part 14: Share report as Markdown download
+## Part 15: Share report as Markdown download
 
 - [ ] Build Markdown from the structured report in code (no AI call)
 - [ ] Download button saves a `.md` file

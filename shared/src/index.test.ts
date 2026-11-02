@@ -28,8 +28,21 @@ describe('reportRequestSchema', () => {
     expect(reportRequestSchema.safeParse({ ...valid, need: 'a'.repeat(500) }).success).toBe(true);
   });
 
-  it('rejects an unknown framework', () => {
-    expect(reportRequestSchema.safeParse({ ...valid, framework: 'Ember' }).success).toBe(false);
+  it.each([
+    'Next.js',
+    'React Native',
+    'Nuxt',
+    'Solid',
+    'Express',
+    'Fastify',
+    'NestJS',
+    'No framework',
+  ])('accepts %s', (framework) => {
+    expect(reportRequestSchema.safeParse({ ...valid, framework }).success).toBe(true);
+  });
+
+  it.each(['Ember', 'None'])('rejects the framework %s', (framework) => {
+    expect(reportRequestSchema.safeParse({ ...valid, framework }).success).toBe(false);
   });
 
   it('rejects more than 200 dependencies', () => {

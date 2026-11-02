@@ -1,6 +1,20 @@
 import * as z from 'zod';
 
-export const frameworks = ['React', 'Vue', 'Angular', 'Svelte', 'Node.js', 'None'] as const;
+export const frameworks = [
+  'React',
+  'Next.js',
+  'React Native',
+  'Vue',
+  'Nuxt',
+  'Angular',
+  'Svelte',
+  'Solid',
+  'Node.js',
+  'Express',
+  'Fastify',
+  'NestJS',
+  'No framework',
+] as const;
 export type Framework = (typeof frameworks)[number];
 
 // Size limits keep the AI prompt, and so the cost per request, bounded.
