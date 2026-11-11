@@ -1,21 +1,21 @@
-# Finished parts
+# MVP plan
 
-Parts 1 to 14 of `plan.md`, moved here once done. Kept for the measurements and decisions
-recorded along the way.
+The MVP, built as Parts 1 to 14. Kept for the measurements and decisions recorded along the way.
+Work after the MVP is in `plan-platform.md` and `plan-agents.md`.
 
 ## Part 1: Plan
 
 - [x] Enrich this document with substeps, tests and success criteria per part
-- [x] User reviews and approves the plan
+- [x] Review and approve the plan
 
-Success criteria: the user approves this document.
+Success criteria: the plan is reviewed and approved before any code is written.
 
 ## Part 2: Scaffolding
 
 - [x] `git init`
 - [x] `.gitignore` (node_modules, dist, .env)
-- [x] Project name: `dependency-decision`
-- [x] Public GitHub repo: https://github.com/yforsher/dependency-decision
+- [x] Project name: `dependency-decision` (later renamed to Depsie)
+- [x] Public GitHub repo: https://github.com/yforsher/depsie
 - [x] Root `package.json` and `pnpm-workspace.yaml` with `client`, `server` and `shared` (types
       used by both)
 - [x] `tsconfig.base.json` (strict), extended by each package as it is created (`server/` in
@@ -103,9 +103,9 @@ at most 5 name@version candidates.
       by hand and adding the response shape to `docs/endpoints.md`
 - [x] Fetch version-specific package metadata and README from npm, and security findings and activity data from deps.dev, OSV, npm downloads, and GitHub, on every request
 - [x] Stars, open issues and Scorecard from deps.dev; one GitHub call per package for the last
-      push and the archived flag (decided with the user). Stars moved to GitHub in Part 9
+      push and the archived flag. Stars moved to GitHub in Part 9
 - [x] When npm's metadata has no README, fall back to the published `README.md` on jsDelivr
-      (decided with the user; npm has none for `cron@4.4.0` although the package ships one)
+      (npm has none for `cron@4.4.0` although the package ships one)
 - [x] Merge into one `PackageData` type, with source and fetch date per field (one group per
       source: every field in a group shares its source, URL and fetch date)
 - [x] A failed source (GitHub rate limit, no repository, timeout) marks its fields as unavailable
@@ -159,12 +159,6 @@ Success criteria: a report is generated for a sample need and returned without b
       invalid reference listed
 - [x] Comparison prompt lists words to avoid and gives good and bad claim examples; measured on 8
       real reports before and after (results in `AGENTS.md`, under the model choice)
-- [ ] Investigate intermittent 502s: the model sometimes writes a literal `...` as a package name
-      or field (`...`, `npm...`), 2 failures in 11 real runs (0 in 8 since the prompt change).
-      Read the logged output of the next failure to find the cause. First logged failure
-      (2026-10-27): the model wrote its reasoning text into the first package name and filled the
-      rest with a template of `...` placeholders, after only 590 completion tokens; the cause of
-      that output is not proven yet
 
 Tests: integration tests with a mocked fetch layer, including each error status; the existing
 mock-based tests still pass.
@@ -269,7 +263,7 @@ Fixes after review:
       need, React), two real reports, 21s and 24s: summary above the cards, npm descriptions,
       facts in 4 columns on desktop and 2 at 390px, no horizontal scroll. Both
       ranked `qrcode.react` first with release activity Caution and no con, so the con rule from
-      the earlier item held in 3 runs but not in these 2. The user approved the look
+      the earlier item held in 3 runs but not in these 2. Look approved after review
 
 Tests: component tests for the empty, loading, error and report states; existing report
 rendering tests updated to the new layout. Source labels show only the source name; `npm` and
@@ -283,7 +277,7 @@ labels; the summary shows once, above the cards; rejected alternatives show cons
 collapsed; an answer without a summary, a ranked package without a pro or a rejected one without
 a con is rejected.
 
-Success criteria: the user approves the look in the browser; the top recommendation and why it
+Success criteria: the look is approved after a browser review; the top recommendation and why it
 was chosen are clear without scrolling through the whole report; no field path or raw array is
 visible in the report.
 
@@ -310,7 +304,7 @@ happened and how long each step took.
 
 ## Part 11: Analytics
 
-- [x] Choose with the user between a privacy-friendly hosted tool (for example Plausible, Umami
+- [x] Choose between a privacy-friendly hosted tool (for example Plausible, Umami
       or Cloudflare Web Analytics) and server-side counts, depending on the host chosen. Chosen:
       server-side counts in Neon Postgres (free plan, wakes by itself after idle), one project
       with a `main` branch for production and a `dev` branch for local runs
@@ -330,7 +324,7 @@ happened and how long each step took.
 Tests: the tracking call carries only the allowed fields; no tracking call contains the need or
 dependencies.
 
-Success criteria: after a few real reports the user can see who used it (country), when, how
+Success criteria: after a few real reports the analytics show who used it (country), when, how
 often and at what cost, and the collected fields match the privacy section.
 
 ## Part 12: Model comparison
@@ -347,7 +341,7 @@ about 1s) and produces about 2,500 tokens every time, yet it took 5.1s on Crusoe
 Parasail, 44.0s on DekaLLM and 73.5s on Near AI. Parasail charged $0.0024 for it, about 3 times
 the $0.0007 measured earlier.
 
-- [x] Choose one or two candidate models with the user, from OpenRouter models that support
+- [x] Choose one or two candidate models from OpenRouter models that support
       strict structured output, with their price per report. Chosen on 2026-10-29:
       `anthropic/claude-haiku-5.5` and `openai/gpt-6-luna`, both $0.10 / $0.50 per million input
       / output tokens, about $0.0023 per report at list price (8,000 prompt and 3,000 completion
@@ -358,7 +352,7 @@ the $0.0007 measured earlier.
       for rendering to the DOM.", React). The other two: "Validate form input with a schema and
       show field errors" (React) and "Format and parse dates with time zones" (Node.js)
 - [x] Run each need 3 times on each model and save the outputs outside the repo
-      (`C:\Users\PC\dev\depwise-model-runs`, with the `compare.mts` and `summarize.mts` scripts)
+      (with the comparison scripts)
 - [x] Compare per model: rejected or failed runs, whether rank 1 stays the same across runs,
       whether the same fact gets the same status, rule breaks (pros that only restate a shown
       fact, field paths, status words, judgements the data does not show), time and cost per report
@@ -385,17 +379,17 @@ the $0.0007 measured earlier.
       5 to 102s (43.8s average), $0.0024 average, 2 failed (a 120s timeout and a repeated
       package). Call 2 took 2.1s on Cerebras ($0.0040), 12.8s on Parasail and 79.8s on Near AI,
       which OpenRouter still picked for 3 of 8 calls.
-- [x] Choose the model and provider settings with the user and record the results and the choice
+- [x] Choose the model and provider settings and record the results and the choice
       in the `AGENTS.md` model section. Chosen: `openai/gpt-6-luna` with default routing
 
 Tests: none new; the existing tests pass with the chosen model and provider settings.
 
-Success criteria: the user picks a model and provider settings from measured results on the same
+Success criteria: a model and provider settings are picked from measured results on the same
 needs, and the decision, its typical report time and its cost are recorded in `AGENTS.md`.
 
 ## Part 13: Production deployment
 
-- [x] Choose a host with the user, comparing free tier and paid options; check its request timeout
+- [x] Choose a host, comparing free tier and paid options; check its request timeout
       fits a report of about 30 seconds. Chosen: Google Cloud Run (300 second default timeout, max
       1 instance, instance-based billing); Neon stays the database. Settings in `docs/hosting.md`
 - [x] Set `OPENROUTER_API_KEY`, `GITHUB_TOKEN` and `DATABASE_URL` (the Neon `main` branch, already
@@ -417,7 +411,7 @@ needs, and the decision, its typical report time and its cost are recorded in `A
       instead of Express's default 500
 - [x] Spending cap on the OpenRouter key in the OpenRouter dashboard, as a hard cost limit across
       all IPs
-- [x] `LICENSE` file (MIT unless the user chooses otherwise). MIT, copyright 2026 Jonas
+- [x] `LICENSE` file: MIT, copyright 2026 Jonas
 - [x] Real report on the live URL in the browser. A real `POST /api/report` returned 200 in 50.4
       seconds with all sources fetched, the analytics rows reached Neon, and it works in the browser
 
@@ -457,3 +451,16 @@ in each new scope is in `sent`.
 Success criteria: reloading the page shows different examples, the text does not change while
 typing, the dropdown shows the new frameworks and `No framework`, a report succeeds with one of the
 new frameworks, and all tests pass.
+
+## Open items
+
+- Markdown download (Part 15, not started): moved to Part 4 of `plan-platform.md`.
+- Package data cache: dropped for now, since resolving the latest version already fetches the
+  metadata and README, AI calls dominate cost and latency, and free hosts often wipe the disk.
+  Revisit with an in-memory cache only if npm latency or limits become a problem.
+- Intermittent 502s (open, moved from Part 8): on `openai/gpt-oss-120b` the model sometimes wrote
+  a literal `...` as a package name or field (`...`, `npm...`), 2 failures in 11 real runs (0 in 8
+  after the prompt change). First logged failure (2026-10-27): reasoning text in the first package
+  name and `...` placeholders for the rest, after only 590 completion tokens; cause not proven.
+  Not seen on `openai/gpt-6-luna` (0 failures in 9 runs, Part 12). Read the logged output of the
+  next failure, if one happens, to find the cause.

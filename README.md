@@ -8,6 +8,12 @@ Live at https://depsie.cloud.run
 An LLM finds the candidates, then compares and ranks them using only public data fetched for each
 report, citing that data for its claims.
 
+## How it is built
+
+I plan each part, make the design decisions and review the result; Claude Code writes most of the
+code. Each part has tests and success criteria, and the measurements and decisions behind finished
+parts are in `docs/plan-mvp.md`.
+
 ## Run
 
 Requires Node 22+ and pnpm.
