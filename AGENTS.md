@@ -82,6 +82,18 @@ Read `docs/plan-platform.md` for the current state, then `docs/plan-agents.md`, 
 it. The MVP and its measurements are in `docs/plan-mvp.md`. Each plan is executed one part at a
 time.
 
+## Workflow
+
+- `docs/plan-platform.md`, then `docs/plan-agents.md`, are the backlog. Take only the next
+  unchecked part.
+- OpenSpec turns that part into a change in `openspec/` (`openspec-propose`), implements it
+  (`openspec-apply-change`) and archives it (`openspec-archive-change`). When archived, check
+  off the part's substeps in its plan file.
+- Superpowers is for execution discipline only: `test-driven-development`,
+  `systematic-debugging`, `verification-before-completion` and the code-review skills.
+- Do not use `superpowers:brainstorming`, `writing-plans`, `executing-plans` or
+  `subagent-driven-development`; the plan files and OpenSpec replace them.
+
 ## Coding standards
 
 1. Use latest versions of libraries and idiomatic approaches as of today.
