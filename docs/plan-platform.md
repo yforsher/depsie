@@ -33,15 +33,15 @@ Feature flags in this plan:
 
 ## Part 1: Product requirements
 
-- [ ] `docs/product.md`: who uses Depsie (a developer choosing a package, with or without an
+- [x] `docs/product.md`: who uses Depsie (a developer choosing a package, with or without an
       account), the main use cases, and a measurable goal for each (for example: time to a
       decision, reports refreshed or refined instead of re-run, reports opened again or shared)
-- [ ] Update `AGENTS.md`: business requirements, out of scope list and privacy constraints for
+- [x] Update `AGENTS.md`: business requirements, out of scope list and privacy constraints for
       the platform and agents plans (accounts, saved reports, share links, chat). The MVP rule "no
       storage of user input or generated reports, and no shareable reports" is replaced by the
       decisions below; the package.json rules (filtered in the browser) stay
-- [ ] Map each part of this plan to the use case it serves
-- [ ] Record these decisions in `docs/product.md`:
+- [x] Map each part of this plan to the use case it serves
+- [x] Record these decisions in `docs/product.md`:
   - Anonymous reports are saved with a unique, unguessable link; anyone with the link can open
     it. They are kept for 30 days and then deleted, and can be deleted earlier from the link.
     They are read-only (no chat, no refresh, no new versions)
