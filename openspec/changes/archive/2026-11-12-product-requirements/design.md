@@ -29,13 +29,13 @@ See proposal.md for why. Two facts shape the goals:
 
 **Use cases and goals in `docs/product.md`.** Draft, for the user to approve or change:
 
-| Use case                                                     | Goal                                                                                        | Measured from                                  |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| 1. Pick a package for a need, with no account                | Median time to a report under 40 s; at least 95% of report requests succeed                 | Eval suite and traces (time); `events` status |
-| 2. Share a decision with a teammate or reviewer               | At least 1 in 5 signed-in reports gets a share link                                         | `reports.share_id`                             |
-| 3. Come back to a past decision and check it is still valid  | At least 1 in 4 signed-in reports reaches version 2 (refresh or chat) instead of a new run | `report_versions.source`                       |
-| 4. Refine a report in a conversation                          | Every chat version passes the grounding check; median cost per turn under the per-turn cap | `report_versions`, `ai_usage`                  |
-| 5. Get a report from the editor (MCP)                         | A report created through MCP matches the eval quality checks of the form pipeline          | Eval suite, `ai_usage.source`                  |
+| Use case                                                    | Goal                                                                                       | Measured from                                 |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| 1. Pick a package for a need, with no account               | Median time to a report under 40 s; at least 95% of report requests succeed                | Eval suite and traces (time); `events` status |
+| 2. Share a decision with a teammate or reviewer             | At least 1 in 5 signed-in reports gets a share link                                        | `reports.share_id`                            |
+| 3. Come back to a past decision and check it is still valid | At least 1 in 4 signed-in reports reaches version 2 (refresh or chat) instead of a new run | `report_versions.source`                      |
+| 4. Refine a report in a conversation                        | Every chat version passes the grounding check; median cost per turn under the per-turn cap | `report_versions`, `ai_usage`                 |
+| 5. Get a report from the editor (MCP)                       | A report created through MCP matches the eval quality checks of the form pipeline          | Eval suite, `ai_usage.source`                 |
 
 Use case 1 is the MVP and stays the anonymous default. Cost limits are constraints, not use
 cases: they live in `AGENTS.md` and in Part 4, not in this table.
