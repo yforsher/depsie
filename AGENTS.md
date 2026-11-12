@@ -2,7 +2,7 @@
 
 **User flow**
 This project is a tool that helps developers pick the right npm package for their needs.
-Users, use cases, goals and the storage decisions are in `docs/product.md`.
+Users, use cases and the storage decisions are in `docs/product.md`.
 
 The form flow below is the same with or without an account. It has no chat and no follow-up
 turns: each request makes a fixed, small number of AI calls to keep costs predictable. Signed-in
@@ -14,7 +14,8 @@ step limit and a cost cap enforced in code.
 2. AI call 1, query expansion: the need and framework become npm search keywords and candidate package names. If the user provides package.json, include its filtered public dependency names and declared version ranges as context.
 3. The server fetches public data for the candidates on each request.
 4. AI call 2, comparison and report: a grounded comparison of the candidates. Reports are generated per request.
-5. Done. The result is shown, saved with a link (rules in `docs/product.md`), and can be exported.
+5. Done. The result is shown and can be exported. The user can create a share link with a button
+   (rules in `docs/product.md`).
 
 **Report contents**
 
@@ -38,9 +39,10 @@ step limit and a cost cap enforced in code.
 
 - The tool must work fully without a file: need + framework is enough for a result.
 - package.json is optional and is parsed and filtered in the browser only. The server receives the need, framework, and filtered public dependency names and declared version ranges; never the raw file, scoped packages outside the allowlist, or non-registry entries. Rules in `client/AGENTS.md`.
-- Reports are stored only as decided in `docs/product.md`: anonymous reports for 30 days behind an
-  unguessable link, and signed-in reports privately until the user deletes them or the account,
-  with an optional share link the owner can revoke. Deleting an account deletes all its data.
+- Reports are stored only as decided in `docs/product.md`, and deleted after a configurable
+  retention period: anonymous reports 10 days, or 30 days once the user creates a share link;
+  signed-in reports 100 days from the latest version, private, with an optional share link the owner can revoke. Deleting
+  an account deletes all its data.
   Package data is not cached.
 - Anonymous activity analytics: visits, report count, framework, success or error status,
   time, country, and AI tokens and cost per report. Unique visitors are counted per day with a

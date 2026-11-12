@@ -42,11 +42,15 @@ Feature flags in this plan:
       decisions below; the package.json rules (filtered in the browser) stay
 - [x] Map each part of this plan to the use case it serves
 - [x] Record these decisions in `docs/product.md`:
-  - Anonymous reports are saved with a unique, unguessable link; anyone with the link can open
-    it. They are kept for 30 days and then deleted, and can be deleted earlier from the link.
-    They are read-only (no chat, no refresh, no new versions)
-  - Reports of signed-in users are private and kept until the user deletes them or the account.
-    The owner can create a read-only share link and revoke it
+  - Every report is saved and deleted after a retention period: 10 days for an anonymous report
+    without a link and 30 days for one with a link, counted from its creation; 100 days for a
+    report of a signed-in user, counted from its latest version. The periods are constants in one
+    place, easy to change
+  - Anonymous reports get a share link only when the user creates one with a button; anyone with
+    the link can open it, and the report can be deleted earlier from the link. They are read-only
+    (no chat, no refresh, no new versions)
+  - Reports of signed-in users are private; the user can delete them earlier, and deleting the
+    account deletes them. The owner can create a read-only share link and revoke it
   - No teams and no package policy; see Later
 
 Tests: none.
@@ -161,12 +165,18 @@ GitHub consent screen lists only read access to profile and email.
 - [ ] `share_id`: random, at least 128 bits, base64url; a report with a `share_id` opens read-only
       at `/s/:share_id` with no sign-in. Share pages are `noindex` and send
       `Referrer-Policy: no-referrer`, and show the latest version
-- [ ] Signed-in reports: saved to the user, private, no expiry; open at `/reports/:id` for the
-      owner only. The owner can create a share link (copy button) and revoke it, which clears
-      `share_id`; a new link gets a new id
-- [ ] Anonymous reports: saved with no user, a `share_id` and `expires_at` 30 days ahead; the
-      result shows the link with a copy button and the deletion date; the link page has a delete
-      button
+- [ ] Retention periods as constants in one module: anonymous without a link 10 days, anonymous
+      with a link 30 days, each counted from the report's `created_at`; signed-in 100 days,
+      counted from the latest version, so a refresh or chat version restarts it. `expires_at` is
+      set from them when the report is saved, when a version is appended and when an anonymous
+      link is created
+- [ ] Signed-in reports: saved to the user, private, `expires_at` 100 days ahead; open at
+      `/reports/:id` for the owner only. The owner can create a share link (copy button) and
+      revoke it, which clears `share_id`; a new link gets a new id
+- [ ] Anonymous reports: saved with no user and `expires_at` 10 days ahead; the result has a
+      button to create a share link, which sets `share_id` and moves `expires_at` to 30 days after
+      `created_at`, then shows the link with a copy button and the deletion date; the link page
+      has a delete button
 - [ ] Expired reports return 404 on read, whether or not they are deleted yet
 - [ ] Daily cleanup: a Cloud Run job (`pnpm cleanup`) started by Cloud Scheduler deletes expired
       reports and their versions; no public endpoint
@@ -174,7 +184,10 @@ GitHub consent screen lists only read access to profile and email.
       can open it, and how to delete it or revoke a link; that a session cookie is set only after
       signing in and is needed for it to work (the note says today that there are no cookies)
 
-Tests: an anonymous report opens by its link and returns 404 after `expires_at`; the cleanup
+Tests: each kind of report gets the `expires_at` of its retention period, and creating an
+anonymous link moves it from 10 to 30 days, and a new version of a signed-in report moves it to
+100 days from now; an anonymous report opens by its link and returns 404
+after `expires_at`; the cleanup
 deletes only expired reports; delete by link works; a signed-in report is 404 for other users and
 at `/s/` until shared; a revoked link returns 404 and a new link works; a report saved with an
 older schema version still opens.

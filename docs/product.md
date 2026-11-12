@@ -4,47 +4,49 @@
 
 A JavaScript or TypeScript developer choosing an npm package for a need in their project.
 
-- Anonymous: no account. Fills in the form, gets a report with a link, and leaves.
+- Anonymous: no account. Fills in the form, gets a report, can create a share link, and leaves.
 - Signed in (GitHub): the same form, plus private saved reports, history, refresh, share links,
   chat and MCP.
 
-## Use cases and goals
+## Use cases
 
-The goals are starting targets, revised from the usage page (platform plan, Part 7) once there is
-real data. Each one is measured from data the plans already build; no tracking is added only to
-measure a goal.
-
-| Use case                                                    | Goal                                                                                       | Measured from                                   |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------- |
-| 1. Pick a package for a need, with no account               | Median time to a report under 40 s; at least 95% of report requests succeed                | Eval suite and traces (time); `events` (status) |
-| 2. Share a decision with a teammate or reviewer             | At least 1 in 5 signed-in reports gets a share link                                        | `reports.share_id`                              |
-| 3. Come back to a past decision and check it is still valid | At least 1 in 4 signed-in reports reaches version 2 (refresh or chat) instead of a new run | `report_versions.source`                        |
-| 4. Refine a report in a conversation                        | Every chat version passes the grounding check; median cost per turn under the per-turn cap | `report_versions`, `ai_usage`                   |
-| 5. Get a report from the editor (MCP)                       | A report created through MCP meets the same eval quality checks as the form pipeline       | Eval suite, `ai_usage.source`                   |
-
-Use case 1 is the MVP and stays the default without an account.
+1. Pick a package for a need, with no account. This is the MVP and stays the default without an
+   account.
+2. Share a decision with a teammate or reviewer.
+3. Come back to a past decision and check it is still valid.
+4. Refine a report in a conversation.
+5. Get a report from the editor (MCP).
 
 ## Decisions
 
-- Anonymous reports are saved with a unique, unguessable link; anyone with the link can open it.
-  They are kept for 30 days and then deleted, and can be deleted earlier from the link. They are
-  read-only: no chat, no refresh, no new versions.
-- Reports of signed-in users are private and kept until the user deletes them or the account. The
-  owner can create a read-only share link and revoke it.
+- Every report is saved, and deleted after a retention period. The periods are constants in one
+  place, so they are easy to change:
+
+  | Report                       | Kept for                                                    |
+  | ---------------------------- | ----------------------------------------------------------- |
+  | Anonymous, without a link    | 10 days from its creation                                   |
+  | Anonymous, with a share link | 30 days from its creation                                   |
+  | Signed-in user               | 100 days from its latest version (refresh or chat restarts) |
+
+- An anonymous report gets a share link only when the user creates one with a button. The link is
+  unique and unguessable, and anyone with it can open the report. The report can be deleted
+  earlier from the link. It is read-only: no chat, no refresh, no new versions.
+- Reports of signed-in users are private. The user can delete them earlier, and deleting the
+  account deletes them. The owner can create a read-only share link and revoke it.
 - No teams and no package policy; see Later in `plan-platform.md`.
 
 ## Plan parts by use case
 
 | Part                                           | Use case                                          |
 | ---------------------------------------------- | ------------------------------------------------- |
-| Platform 1: Product requirements               | All: sets the goals                               |
+| Platform 1: Product requirements               | All: sets the use cases                           |
 | Platform 2: Regression check and feature flags | All: keeps the product working                    |
 | Platform 3: Drizzle ORM and migrations         | All: keeps the product working                    |
 | Platform 4: Accounts and limits                | 2, 3, 4, 5: needed for private reports and limits |
 | Platform 5: Saved reports and links            | 2                                                 |
 | Platform 6: History, freshness and export      | 3                                                 |
-| Platform 7: Observability and usage            | All: makes the goals measurable                   |
-| Agents 1: Eval suite and baseline              | All: makes the goals measurable                   |
+| Platform 7: Observability and usage            | All: shows time, cost and errors                  |
+| Agents 1: Eval suite and baseline              | All: measures report quality                      |
 | Agents 2: Tool layer                           | 4, 5                                              |
 | Agents 3: Chat to refine a saved report        | 4                                                 |
 | Agents 4: Chat to create a report              | 4                                                 |
