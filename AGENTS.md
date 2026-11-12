@@ -57,7 +57,7 @@ No chat and no follow-up turns: each request makes a fixed, small number of AI c
 | Hosting     | Google Cloud Run (one instance); the server serves the built client                   |
 
 **Model: `openai/gpt-6-luna`**, chosen on 2026-10-29 from a comparison of 3 sample needs run 3
-times each (`docs/plan-done.md`, Part 12):
+times each (`docs/plan-mvp.md`, Part 12):
 
 - Typical report: 26 to 39 seconds (32s average), about $0.0023 ($0.10 / $0.50 per million input
   / output tokens). Default OpenRouter routing; every run went to OpenAI, and the other providers
@@ -78,7 +78,9 @@ Before working on files in `client/` or `server/`, read that folder's `AGENTS.md
 
 ## Current state
 
-Read `docs/plan.md` for the current state. The plan is executed one part at a time.
+Read `docs/plan-platform.md` for the current state, then `docs/plan-agents.md`, which starts after
+it. The MVP and its measurements are in `docs/plan-mvp.md`. Each plan is executed one part at a
+time.
 
 ## Coding standards
 
