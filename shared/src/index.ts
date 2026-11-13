@@ -32,6 +32,15 @@ export const reportRequestSchema = z.object({
 });
 export type ReportRequest = z.infer<typeof reportRequestSchema>;
 
+// Each flag is turned on by FEATURE_<NAME>=on on the server (see server/src/features.ts).
+export const features = ['report-links', 'accounts'] as const;
+export type Feature = (typeof features)[number];
+
+/** GET /api/features */
+export interface FeaturesResponse {
+  enabled: Feature[];
+}
+
 /** Points at one fetched data field; the server checks it exists for the report. */
 export interface EvidenceRef {
   package: string;

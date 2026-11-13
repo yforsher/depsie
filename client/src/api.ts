@@ -1,4 +1,4 @@
-import type { Report, ReportRequest } from 'shared';
+import type { FeaturesResponse, Report, ReportRequest } from 'shared';
 
 async function serverError(res: Response): Promise<string> {
   return ((await res.json()) as { error: string }).error;
@@ -26,4 +26,10 @@ export async function fetchReport(request: ReportRequest): Promise<Report> {
   });
   if (!res.ok) throw new Error(await errorMessage(res));
   return res.json() as Promise<Report>;
+}
+
+export async function fetchFeatures(): Promise<FeaturesResponse> {
+  const res = await fetch('/api/features');
+  if (!res.ok) throw new Error(`Feature flags failed with status ${res.status}`);
+  return res.json() as Promise<FeaturesResponse>;
 }

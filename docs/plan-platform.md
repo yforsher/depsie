@@ -70,8 +70,9 @@ Success criteria: the user approves `docs/product.md` and the updated `AGENTS.md
       client shows no UI for a flag that is off
 - [ ] Add the two rules above (no regressions, flags) to `AGENTS.md`
 
-Tests: a route behind a flag returns 404 when off and works when on; the client hides the UI of a
-flag that is off.
+Tests: the flags are read from the environment and listed by `GET /api/features`; the client
+hides the UI of a flag that is off. A flagged route is registered only when its flag is on, and
+no route is flagged yet, so "a route behind a flag returns 404 when off" is tested in Part 4.
 
 Success criteria: the smoke test passes in CI and against the live URL.
 
@@ -145,7 +146,9 @@ URL.
   - A credit limit on the OpenRouter API key, set in OpenRouter, as a backstop
 - [ ] Delete account: removes the user, their sessions and all their reports and share links
 
-Tests: 401 without a session; user A gets 404 for any report of user B; the anonymous report
+Tests: the sign-in and account routes return 404 while `accounts` is off and work when it is on
+(the first flagged routes, see Part 2); 401 without a session; user A gets 404 for any report of
+user B; the anonymous report
 endpoint still works; every AI call writes an `ai_usage` row; the per-user limit and each cost
 cap reject the next request; deleting an account removes all its data.
 

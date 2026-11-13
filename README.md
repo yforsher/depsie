@@ -49,6 +49,17 @@ pnpm lint
 pnpm test
 ```
 
+Smoke test in a browser (Playwright), with npm, OSV and the AI answered from recorded responses.
+It builds the app and starts the server on port 3100 (run `pnpm exec playwright install chromium`
+once first). A server already listening on 3100 is reused without a build, so stop it first or
+the run tests old code:
+
+```sh
+pnpm e2e
+```
+
+Against a deployment, with real data and one real report: `BASE_URL=https://... pnpm e2e`.
+
 ## License
 
 MIT. See `LICENSE`.

@@ -21,7 +21,8 @@ structured report in code, without an AI call.
 
 ## Server API
 
-A single `POST /api/report` call with `{ need, framework, dependencies? }` (types in `shared/`).
+A single `POST /api/report` call with `{ need, framework, dependencies? }` (types in `shared/`),
+and `GET /api/features` for the enabled feature flags.
 Show a clear message for each error: 400 (invalid input), 429 (rate limit), 502 (AI failure).
 
 ## Color scheme
@@ -71,8 +72,12 @@ label or icon, never color alone.
 - `src/main.tsx`: entry point with the TanStack Query provider.
 - `src/App.tsx`: runs the report request as a mutation. Two columns from 960px: the form on the
   left, the result column on the right with an empty, loading, error or report state.
-- `src/api.ts`: `fetchReport()`, the only function that talks to the server (`POST /api/report`).
-  Turns 400, 429, 502 and any other failure status into a clear error message.
+- `src/api.ts`: the only module that talks to the server. `fetchReport()` (`POST /api/report`)
+  turns 400, 429, 502 and any other failure status into a clear error message;
+  `fetchFeatures()` reads `GET /api/features`.
+- `src/features.ts`: `useFeature(name)` is true only when the server lists the flag. Fetched once
+  per page load; while loading or after a failure it is false, so put every flagged piece of UI
+  behind it and it stays hidden until the flag is on.
 - `src/mockReport.ts`: a fixed report used by the tests.
 - `vite.config.ts`: in dev, `/api` is proxied to the Express server on port 3000.
 - `src/packageJson.ts`: parsing and privacy filtering (scope allowlist, non-registry ranges).

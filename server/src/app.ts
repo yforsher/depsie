@@ -1,9 +1,10 @@
 import express, { type ErrorRequestHandler } from 'express';
 import { rateLimit } from 'express-rate-limit';
-import { reportRequestSchema } from 'shared';
+import { type FeaturesResponse, reportRequestSchema } from 'shared';
 import * as z from 'zod';
 import { recordVisit, reportAnalytics, setFramework } from './analytics.js';
 import { NpmError } from './candidates.js';
+import { enabledFeatures } from './features.js';
 import { log, requestLogging } from './log.js';
 import { AiError } from './openrouter.js';
 import { generateReport } from './report.js';
@@ -20,6 +21,12 @@ export function createApp(clientDir: string) {
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });
+  });
+
+  // Read once: the environment does not change while the server runs.
+  const enabled = enabledFeatures(process.env);
+  app.get('/api/features', (_req, res) => {
+    res.json({ enabled } satisfies FeaturesResponse);
   });
 
   const reportLimiter = rateLimit({

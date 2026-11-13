@@ -8,6 +8,7 @@ The server is the only place that holds API keys (`OPENROUTER_API_KEY`, `GITHUB_
 ## Endpoints
 
 - `GET /api/health` returns `{ status: "ok" }`.
+- `GET /api/features` returns the enabled feature flags, `{ enabled: Feature[] }`.
 - `POST /api/report` is the only report endpoint. It validates `{ need, framework, dependencies? }`
   with Zod (with input size limits), then runs the whole pipeline and returns the report. There is
   no endpoint per stage, so clients cannot trigger AI call 2 with their own candidate list.
@@ -62,6 +63,12 @@ failing the request.
   It takes the client build directory and serves it with SPA fallback; unknown `/api/` paths
   return 404.
 - `src/index.ts`: entry point; listens on `PORT` (default 3000) and serves `client/dist`.
+- `src/features.ts`: feature flags. The names are `features` in `shared/`; `FEATURE_<NAME>=on`
+  (dashes as underscores) turns one on, and anything else leaves it off, so production is off
+  unless set and `.env.example` turns them on for local development. `createApp()` reads them
+  once at startup. Put a route behind a flag by registering it in `createApp()` only when the
+  flag is on (`if (enabled.includes('accounts')) app.use(...)`): while the flag is off the route
+  does not exist and gets the same 404 as an unknown API path, however it is mounted.
 - `src/log.ts`: `log()` prints one line prefixed with the request ID, kept in an
   `AsyncLocalStorage` set by the `requestLogging` middleware on `POST /api/report`, so pipeline
   code can log without passing the ID around. Lines: request received, each AI call (duration,
@@ -112,8 +119,13 @@ failing the request.
 - `POST /api/report` in `src/app.ts`: rate limited to 10 per hour per IP (429), Zod validation
   (400), then `generateReport()`; `AiError` becomes 502 with the message, and the rejected model
   output is logged to the console (never stored) so failures can be investigated.
-- `src/fixtures/`: trimmed real responses used by the fetcher tests; `src/fixtures.ts` serves
-  them through a mocked `fetch`, plus a valid AI call 2 answer (excluded from the build).
+- `src/fixtures/`: trimmed real responses. `src/fixtureResponses.ts` serves them by URL, builds
+  a valid AI call 2 answer, and has `fakeFetch()`, which answers every outside call of a whole
+  report (each AI call by the schema name it asks for). `src/fixtures.ts` re-exports it and adds
+  `mockSources()`, the only part that needs Vitest. All three are excluded from the build.
+- `src/e2e.ts`: the server for the Playwright smoke test (`e2e/` at the repo root). It replaces
+  `fetch` with `fakeFetch()` and starts `index.ts`, so the real server runs with no keys and no
+  outside calls. `pnpm --filter server e2e` runs it on `PORT`; excluded from the build.
 - The request schema (`reportRequestSchema`) lives in `shared/` and is used by both client and
   server.
 - `.env` is loaded from the repo root with Node's `--env-file-if-exists` flag (see `package.json`

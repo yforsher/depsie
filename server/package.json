@@ -6,7 +6,8 @@
     "dev": "tsx watch --env-file-if-exists=../.env src/index.ts",
     "build": "tsc",
     "start": "node --env-file-if-exists=../.env dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "tsx src/e2e.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
