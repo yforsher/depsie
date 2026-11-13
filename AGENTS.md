@@ -109,6 +109,14 @@ time.
   `systematic-debugging`, `verification-before-completion` and the code-review skills.
 - Do not use `superpowers:brainstorming`, `writing-plans`, `executing-plans` or
   `subagent-driven-development`; the plan files and OpenSpec replace them.
+- No regressions: existing functionality keeps working after every part. All existing tests and
+  the smoke test (`pnpm e2e`) pass in CI, and the "Smoke live" workflow passes against the live
+  URL after each deploy and before turning a flag on. A test changes only when the behavior
+  change is intended, and the commit says why.
+- Feature flags: a new feature stays hidden behind a flag (`FEATURE_<NAME>`, off in production)
+  until it gives the user value on its own. Turning a flag on is the user's decision, recorded in
+  the plan file with the date; the flag is removed in a later small change once the feature is
+  on and working.
 
 ## Coding standards
 

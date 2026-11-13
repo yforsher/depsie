@@ -1,0 +1,26 @@
+name: Smoke live
+
+# Run by hand after every deploy and before turning a feature flag on. Makes one real report
+# (about $0.002) against the given deployment.
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Deployment to test
+        default: https://depsie-kud34vyt4q-ew.a.run.app
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e
+        env:
+          BASE_URL: ${{ inputs.url }}
