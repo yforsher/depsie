@@ -59,22 +59,26 @@ Success criteria: the user approves `docs/product.md` and the updated `AGENTS.md
 
 ## Part 2: Regression check and feature flags
 
-- [ ] End-to-end smoke test (Playwright) of the anonymous flow as it works today: the form with and
+- [x] End-to-end smoke test (Playwright) of the anonymous flow as it works today: the form with and
       without package.json, a report, the export. In CI it runs against the built server with the
       recorded responses in `server/src/fixtures/` instead of live npm and AI calls
-- [ ] The same smoke test against the live URL with one real report, from a manual GitHub Actions
+- [x] The same smoke test against the live URL with one real report, from a manual GitHub Actions
       workflow; run it after every deploy and before turning a flag on
-- [ ] Feature flags in one module: each flag is set by an environment variable (`FEATURE_<NAME>`),
+- [x] Feature flags in one module: each flag is set by an environment variable (`FEATURE_<NAME>`),
       `off` by default in production and `on` in local development; the server returns 404 for
       routes behind a flag that is off and lists the enabled flags in `GET /api/features`; the
       client shows no UI for a flag that is off
-- [ ] Add the two rules above (no regressions, flags) to `AGENTS.md`
+- [x] Add the two rules above (no regressions, flags) to `AGENTS.md`
 
 Tests: the flags are read from the environment and listed by `GET /api/features`; the client
 hides the UI of a flag that is off. A flagged route is registered only when its flag is on, and
 no route is flagged yet, so "a route behind a flag returns 404 when off" is tested in Part 4.
 
 Success criteria: the smoke test passes in CI and against the live URL.
+
+Done 2026-11-13 (PR #9): the `e2e` job passes in CI (2 tests, about 40 seconds), and "Smoke live"
+passed against the deployed version (2 tests in 35 seconds, one real report). Both flags are off
+in production (`GET /api/features` returns `{"enabled":[]}`).
 
 ## Part 3: Drizzle ORM and migrations
 
