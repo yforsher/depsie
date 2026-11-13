@@ -18,7 +18,7 @@
 - [x] 3.2 Add `server/src/e2e.ts` (replaces `fetch` with `fakeFetch`, then starts the server on `PORT`), exclude both new files from the server build; verify a report from `POST /api/report` on the running e2e server returns the fixture package, and `server/dist` has neither file after `pnpm build`
 - [x] 3.3 Add `@playwright/test`, `playwright.config.ts` (webServer on port 3100 when `BASE_URL` is unset), the `pnpm e2e` script and the ignores for `playwright-report/` and `test-results/`; verify `pnpm e2e` starts the server and runs with no tests
 - [x] 3.4 Write `e2e/smoke.spec.ts` (package.json preview; a report from need and framework; no console errors); verify `pnpm e2e` passes locally, and fails when the report view is broken on purpose
-- [ ] 3.5 Add the `e2e` job to `.github/workflows/ci.yml`; verify it passes on the pull request
+- [x] 3.5 Add the `e2e` job to `.github/workflows/ci.yml`; verify it passes on the pull request
 - [x] 3.6 Document the e2e entry and fixtures in `server/AGENTS.md` and `pnpm e2e` in the README test section; verify both name the commands as they run
 
 ## 4. Smoke test against the live URL
