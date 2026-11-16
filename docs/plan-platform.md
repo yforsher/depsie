@@ -123,7 +123,7 @@ Cloud Build expands `$_A/$B` to the first variable only, so substitutions need b
 
 ## Part 4: Accounts and limits
 
-- [ ] Check first and record the answers here:
+- [x] Check first and record the answers here:
   - Does the Better Auth Drizzle adapter, or deleting a report with its versions, need
     interactive transactions, which the Neon HTTP driver does not support (if so, use the Neon
     WebSocket driver)?
@@ -134,38 +134,39 @@ Cloud Build expands `$_A/$B` to the first variable only, so substitutions need b
     report with its versions) needs no transaction, since every user-owned table references
     `user.id` with `ON DELETE CASCADE`. The token is not stored: account database hooks clear
     the access, refresh and ID tokens before the row is written.
-- [ ] Two GitHub OAuth apps, one for local development and one for production (each has one
+- [x] Two GitHub OAuth apps, one for local development and one for production (each has one
       callback URL); the GitHub client secret and `BETTER_AUTH_SECRET` in Secret Manager
-- [ ] Better Auth with its Drizzle adapter: sign in with GitHub, requesting only the `user:email`
+- [x] Better Auth with its Drizzle adapter: sign in with GitHub, requesting only the `user:email`
       scope (name, login and avatar are public; no private profile data, no repository access;
       `read:user` dropped on 2026-11-16, see Part 4's change). Sign-in never asks for
       repository permissions; if repository access is ever needed, it belongs to a separate GitHub
       App installed on repositories the user picks (agents plan, Later)
-- [ ] Sign-in page: one line on what Depsie reads (name, avatar, email) and that it has no access
+- [x] Sign-in page: one line on what Depsie reads (name, avatar, email) and that it has no access
       to repositories, that access can be revoked in GitHub settings, and a link to the privacy
       note; anonymous use stays available
-- [ ] Auth handler mounted before `express.json()`; httpOnly, secure, SameSite=Lax session cookie
-- [ ] `GET /api/me` returns the user, or `null` without a session (not 401, which browsers log as a
+- [x] Auth handler mounted before `express.json()`; httpOnly, secure, SameSite=Lax session cookie
+- [x] `GET /api/me` returns the user, or `null` without a session (not 401, which browsers log as a
       console error on every visit; changed 2026-11-16)
-- [ ] Every user-owned table has `user_id`; every query takes it from the session, never from the
+- [x] Every user-owned table has `user_id`; every query takes it from the session, never from the
       request
-- [ ] Client router (TanStack Router, alongside TanStack Query) for the pages added from here on;
+- [x] Client router (TanStack Router, alongside TanStack Query) for the pages added from here on;
       the server already returns the app shell for every non-API path
-- [ ] Client: sign in and out, the user's avatar; anonymous flow unchanged
-- [ ] Sign-in and everything a signed-in user sees are behind the `accounts` flag (the anonymous
+- [x] Client: sign in and out, the user's avatar; anonymous flow unchanged
+- [x] Sign-in and everything a signed-in user sees are behind the `accounts` flag (the anonymous
       limits are not). A flag can also be a comma-separated list of GitHub logins: on only for
       those signed-in users. While `accounts` is a list, `/signin` works only for listed logins and
       no sign-in button is shown, so the feature can be tested on the live URL
-- [ ] Table `ai_usage` (user_id, source, model, tokens, cost, day): every AI
+- [x] Table `ai_usage` (user_id, source, model, tokens, cost, day): every AI
       call writes one row, including chat turns that change nothing; `user_id` is empty for
       anonymous use. The cost caps and the usage page read only this table
-- [ ] Limits, as constants in one place, tuned later from the usage page (Part 7):
+- [x] Limits, as constants in one place, tuned later from the usage page (Part 7):
   - Signed-in: 10 reports per hour per user instead of per IP (refresh counts), and a daily AI
     cost cap of $0.25 per user
   - Anonymous: 10 reports per hour per IP, as today, and a shared daily AI cost cap of $1 for all
     anonymous use
-  - A credit limit on the OpenRouter API key, set in OpenRouter, as a backstop
-- [ ] Delete account: removes the user, their sessions and all their reports and share links
+  - A backstop outside the code: a small prepaid OpenRouter balance with auto top-up off (chosen
+    2026-11-16), or a credit limit on the API key
+- [x] Delete account: removes the user, their sessions and all their reports and share links
 
 Tests: the sign-in and account routes return 404 while `accounts` is off and work when it is on
 (the first flagged routes, see Part 2); `/api/me` is `null` without a session; the anonymous report
@@ -177,6 +178,20 @@ first user-owned endpoint appears, as Part 2 moved its 404 test.
 Success criteria: with `accounts` set to the user's login on the live URL, sign in and out work
 and a second account cannot see the first account's reports; other visitors see no change; the
 GitHub consent screen lists only read access to email addresses.
+
+Done 2026-11-16 (PR #14): the deploy ran Migrate (4 seconds, four new migrations) and production
+kept its 70 `events` rows. With `accounts` off, "Smoke live" passed (2 tests in 47 seconds); its
+report wrote two `ai_usage` rows with no user ($0.0029 together) and a report row in `events`
+without tokens or cost, and `GET /api/features` returns `{"enabled":[],"signIn":false}`. With
+`FEATURE_ACCOUNTS=yforsher` on `https://depsie.cloud.run`: an anonymous visitor got no sign-in
+button and a 404 from `/api/me`; the consent screen listed only email addresses; sign-in created
+one user row with scope `user:email` and no GitHub tokens; the session cookie was HttpOnly (Secure
+is required by its `__Secure-` prefix; SameSite=Lax is tested, and the live state cookie showed
+it); sign-out removed the session. A refused second account was not tried live, for lack of a
+second GitHub account; `server/src/auth.test.ts` covers it. "A second account cannot see the
+first account's reports" moves to Part 5 with the reports. The flag was set back to `off` the same
+day. The OpenRouter backstop is a prepaid balance of about $10 with auto top-up off, not a key
+credit limit.
 
 ## Part 5: Saved reports and links
 

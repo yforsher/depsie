@@ -41,8 +41,8 @@
 
 ## 7. Integration on the live URL
 
-- [ ] 7.1 After merge with `accounts` off, verify "Smoke live" passes, `GET /api/features` returns no flags, and the live report wrote two `ai_usage` rows with no user
-- [ ] 7.2 With the user's approval, set `FEATURE_ACCOUNTS=<the user's login>` on Cloud Run and verify on the live URL: no sign-in button for an anonymous visitor; `/signin` works for the user; GitHub's consent screen lists only read access to email addresses; the session cookie is httpOnly, secure and SameSite=Lax; a second GitHub account is refused with no user row created; sign-out works; then set the flag back to off and record the results in `docs/plan-platform.md`
+- [x] 7.1 After merge with `accounts` off, verify "Smoke live" passes, `GET /api/features` returns no flags, and the live report wrote two `ai_usage` rows with no user
+- [x] 7.2 With the user's approval, set `FEATURE_ACCOUNTS=<the user's login>` on Cloud Run and verify on the live URL: no sign-in button for an anonymous visitor; `/signin` works for the user; GitHub's consent screen lists only read access to email addresses; the session cookie is httpOnly, secure and SameSite=Lax; a second GitHub account is refused with no user row created; sign-out works; then set the flag back to off and record the results in `docs/plan-platform.md`
 
 ## 8. Code review
 
