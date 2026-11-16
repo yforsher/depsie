@@ -18,23 +18,23 @@
 
 ## 4. CI on a Neon branch
 
-- [ ] 4.1 Load superpowers:test-driven-development with the Skill tool. Check the current docs of `neondatabase/create-branch-action` and `neondatabase/delete-branch-action`, then add the `db` job to `.github/workflows/ci.yml` (pull requests only; branch `pr-<number>` from `production`; `db:migrate`, then the server tests with its `DATABASE_URL`; delete under `if: always()`). Ask the user to add `NEON_API_KEY` as a secret and `NEON_PROJECT_ID` as a variable. Load superpowers:verification-before-completion with the Skill tool and run its check: the job passes on the pull request, `client.test.ts` ran (not skipped) in its log, and the branch is gone from the Neon project afterwards
-- [ ] 4.2 Load superpowers:test-driven-development with the Skill tool. Prove the cleanup on failure: push a temporary commit with a failing server test. Load superpowers:verification-before-completion with the Skill tool and run its check: the `db` job fails, the delete step ran, the branch is gone; then revert the commit
+- [x] 4.1 Load superpowers:test-driven-development with the Skill tool. Check the current docs of `neondatabase/create-branch-action` and `neondatabase/delete-branch-action`, then add the `db` job to `.github/workflows/ci.yml` (pull requests only; branch `pr-<number>` from `production`; `db:migrate`, then the server tests with its `DATABASE_URL`; delete under `if: always()`). Ask the user to add `NEON_API_KEY` as a secret and `NEON_PROJECT_ID` as a variable. Load superpowers:verification-before-completion with the Skill tool and run its check: the job passes on the pull request, `client.test.ts` ran (not skipped) in its log, and the branch is gone from the Neon project afterwards
+- [x] 4.2 Load superpowers:test-driven-development with the Skill tool. Prove the cleanup on failure: push a temporary commit with a failing server test. Load superpowers:verification-before-completion with the Skill tool and run its check: the `db` job fails, the delete step ran, the branch is gone; then revert the commit
 - [x] 4.3 Document the migration rules in `server/AGENTS.md` (generated migrations only, never `push` or hand changes on `production`, forward only, add first and remove in a later deploy, the one `IF NOT EXISTS` edit in the first migration) and the CI job; verify the rules match `docs/plan-platform.md` Part 3
 
 ## 5. Deploy with migrations
 
 - [ ] 5.1 Load superpowers:test-driven-development with the Skill tool. Check the current Cloud Build and Cloud Run deploy docs, then add `cloudbuild.yaml`: build, push, run `node server/dist/db/migrate.js` in the image with `DATABASE_URL` from Secret Manager, then `gcloud run deploy` with the same image, keeping the trigger's existing substitutions. Load superpowers:verification-before-completion with the Skill tool and run its check: the first Cloud Build run after merge passes its Migrate step (no local Docker build: a missing file fails that step, which stops the deploy and keeps the previous revision serving)
-- [ ] 5.2 Document in `docs/hosting.md` the console steps (switch the trigger to `cloudbuild.yaml`, give its service account access to the `DATABASE_URL` secret) and the order build, migrate, deploy; ask the user to do the console steps; verify the trigger shows `cloudbuild.yaml` as its configuration
+- [ ] 5.2 Document in `docs/hosting.md` the console steps (switch the trigger to `cloudbuild.yaml`; its service account already reads the `DATABASE_URL` secret) and the order build, migrate, deploy; ask the user to do the console steps; verify the trigger shows `cloudbuild.yaml` as its configuration
 
 ## 6. Integration
 
-- [ ] 6.1 Build a fresh database only from migrations (a new empty database on the `dev` branch, `pnpm db:migrate`) and compare its `events` schema with production (`production`); verify there are no differences, then drop the empty database
+- [x] 6.1 Build a fresh database only from migrations (a new empty database on the `dev` branch, `pnpm db:migrate`) and compare its `events` schema with production (`production`); verify there are no differences, then drop the empty database
 - [ ] 6.2 After merge, verify the Cloud Build run shows the migrate step before the deploy step, `drizzle.__drizzle_migrations` on `production` has one row and `events` kept its rows, "Smoke live" passes, and a visit to the live URL adds a row to `events`
 
 ## 7. Code review
 
-- [ ] 7.1 Load superpowers:requesting-code-review with the Skill tool, then reproduce and fix every Critical and Important finding
+- [x] 7.1 Load superpowers:requesting-code-review with the Skill tool, then reproduce and fix every Critical and Important finding
 
 ## Workflow follow-up
 

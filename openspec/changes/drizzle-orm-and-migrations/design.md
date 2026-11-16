@@ -61,7 +61,7 @@ implementation: its docs say it has no transactions and does not roll back a fai
 only by `db:generate`. Alternative rejected: `drizzle-kit migrate` in the deploy, which needs
 dev dependencies in the image or a second install in Cloud Build.
 
-**Tests use PGlite (chosen by the user).** In-process Postgres: no Docker (Windows Home), no
+**Tests use PGlite (chosen by the user).** In-process Postgres: no running service, no
 network, a fresh database per test file. `app.test.ts` mocks `./db/client.js` to return a
 Drizzle PGlite client with the migrations applied by `drizzle-orm/pglite/migrator`, and the
 analytics tests read rows back from `events` instead of checking captured values. This also
@@ -113,7 +113,7 @@ account, which already reads the `DATABASE_URL` secret for the Cloud Run service
 
 1. Merge with the trigger still on the generated build: nothing reads the migrations yet, and the
    app writes the same rows.
-2. Run `pnpm db:migrate` against `dev`, then let the switched trigger run it on `production`; both are
+2. Run `pnpm --filter server db:migrate` against `dev`, then let the switched trigger run it on `production`; both are
    no-ops recorded as applied.
 3. Check: a fresh database built from migrations matches `production`; "Smoke live" passes; a visit on
    the live URL adds a row to `events`.

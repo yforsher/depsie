@@ -19,9 +19,10 @@ code that needs them is deployed, so this part adds that path before any new tab
   it, and deletes the branch whether the tests pass or fail.
 - Deploy: a `cloudbuild.yaml` builds the image, runs the migrations on production, then deploys;
   a failed migration stops the deploy.
-- Local development and tests use PGlite (in-process Postgres) with the same migrations.
+- Tests use PGlite (in-process Postgres) with the same migrations; local `pnpm dev` keeps using the
+  Neon `dev` branch.
 - Analytics inserts move to Drizzle. **BREAKING** (setup only): `server/sql/schema.sql` is
-  removed; a new database is set up with `pnpm db:migrate` instead of the SQL editor.
+  removed; a new database is set up with `pnpm --filter server db:migrate` instead of the SQL editor.
 
 ## Capabilities
 
@@ -41,8 +42,8 @@ None. Analytics records the same fields and behaves the same; only its storage c
   tests on PGlite instead of a mocked driver).
 - Dependencies: `drizzle-orm` (server), `drizzle-kit` and `@electric-sql/pglite` (server dev).
 - CI: `.github/workflows/ci.yml` gets a Neon branch per pull request; needs a Neon API key and
-  project ID as GitHub secrets.
+  project ID (a secret and a variable).
 - Deploy: new `cloudbuild.yaml`; the Cloud Build trigger is switched from the generated build to
-  this file, and its service account needs access to the `DATABASE_URL` secret.
+  this file; its service account already reads the `DATABASE_URL` secret.
 - Docs: README setup and privacy sections, `.env.example`, `server/AGENTS.md`,
   `docs/hosting.md`.
