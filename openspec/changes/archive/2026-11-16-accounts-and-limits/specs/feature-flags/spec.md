@@ -61,7 +61,7 @@ everyone else SHALL get the same 404 or a refused sign-in with no account create
 #### Scenario: Unlisted login signs in
 
 - **WHEN** `accounts` is `alice` and `mallory` completes GitHub sign-in
-- **THEN** no user or session is created and `mallory` is returned to the anonymous app
+- **THEN** no user or session is created and `mallory` is returned to `/signin` with an error
 
 ### Requirement: The server lists the enabled flags
 
@@ -71,18 +71,18 @@ those. A flag on for a list of logins SHALL be listed only for a signed-in liste
 #### Scenario: One flag on
 
 - **WHEN** only `accounts` is on and a client calls `GET /api/features`
-- **THEN** the response is `{ "enabled": ["accounts"] }`
+- **THEN** the response has `"enabled": ["accounts"]`
 
 #### Scenario: No flag on
 
 - **WHEN** no flag is on and a client calls `GET /api/features`
-- **THEN** the response is `{ "enabled": [] }`
+- **THEN** the response has `"enabled": []`
 
 #### Scenario: List of logins
 
 - **WHEN** `accounts` is `alice`, and `alice` signed in and an anonymous visitor each call
   `GET /api/features`
-- **THEN** `alice` gets `{ "enabled": ["accounts"] }` and the visitor gets `{ "enabled": [] }`
+- **THEN** `alice` gets `"enabled": ["accounts"]` and the visitor gets `"enabled": []`
 
 ## ADDED Requirements
 

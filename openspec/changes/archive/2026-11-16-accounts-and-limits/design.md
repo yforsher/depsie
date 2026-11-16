@@ -94,7 +94,8 @@ for all anonymous use. The hourly limiter keys on the user id, else `ipKeyGenera
 answers 429 at or above the cap. If the query fails it answers 503, so no report runs unchecked
 (chosen by the user). Order on `POST /api/report`: logging, analytics, `loadUser`, hourly limit,
 cost cap, body parser, handler. Two concurrent requests can both pass just under a cap; the
-overshoot is at most one report (about $0.002), and the OpenRouter credit limit is the backstop.
+overshoot is at most one report (about $0.002), and a small prepaid OpenRouter balance with auto
+top-up off is the backstop (chosen by the user instead of a key credit limit).
 
 **Fixes from the code review.**
 

@@ -11,7 +11,7 @@ an IP or all anonymous use before they spend more than a fixed amount.
 
 Every AI call SHALL write one `ai_usage` row with the user (empty when anonymous), the source (the
 step, for example `query_expansion` or `comparison`), the model, the prompt and completion tokens,
-the cost and the time. A row SHALL be written even when the call's answer is rejected afterwards.
+the cost and the UTC day. A row SHALL be written even when the call's answer is rejected afterwards.
 
 #### Scenario: Anonymous report
 

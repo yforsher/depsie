@@ -51,5 +51,5 @@ sign-in, hidden behind the `accounts` flag, and cost limits that protect the liv
   a dev dependency: only local runs and e2e use the in-memory database.
 - Setup: two GitHub OAuth apps (local and production); `GITHUB_CLIENT_ID`,
   `GITHUB_CLIENT_SECRET`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` locally and in Secret Manager;
-  a credit limit on the OpenRouter key.
+  a small prepaid OpenRouter balance with auto top-up off (or a credit limit on the key).
 - Docs: `server/AGENTS.md`, `client/AGENTS.md`, README, `.env.example`, `docs/hosting.md`.
