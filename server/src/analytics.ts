@@ -1,12 +1,13 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomBytes } from 'node:crypto';
-import { neon } from '@neondatabase/serverless';
 import type { Request, RequestHandler } from 'express';
 import geoip from 'geoip-country';
 import type { Framework } from 'shared';
+import { db } from './db/client.js';
+import { events } from './db/schema.js';
 import { log } from './log.js';
 
-// The only fields ever recorded; see sql/schema.sql and the privacy section in AGENTS.md.
+// The only fields ever recorded; see src/db/schema.ts and the privacy section in AGENTS.md.
 interface ReportFields {
   framework: Framework | null;
   promptTokens: number;
@@ -33,12 +34,18 @@ type Event = { kind: 'visit' } | ({ kind: 'report'; status: number } & ReportFie
 
 async function insert(ip: string, event: Event) {
   const report = event.kind === 'report' ? event : undefined;
-  const sql = neon(process.env.DATABASE_URL!);
-  await sql`insert into events
-    (kind, visitor, country, framework, status, prompt_tokens, completion_tokens, cost)
-    values (${event.kind}, ${visitorHash(ip)}, ${geoip.lookup(ip)?.country ?? null},
-      ${report?.framework ?? null}, ${report?.status ?? null}, ${report?.promptTokens ?? null},
-      ${report?.completionTokens ?? null}, ${report?.cost ?? null})`;
+  await db()
+    .insert(events)
+    .values({
+      kind: event.kind,
+      visitor: visitorHash(ip),
+      country: geoip.lookup(ip)?.country ?? null,
+      framework: report?.framework ?? null,
+      status: report?.status ?? null,
+      prompt_tokens: report?.promptTokens ?? null,
+      completion_tokens: report?.completionTokens ?? null,
+      cost: report?.cost ?? null,
+    });
 }
 
 // Not awaited, so the write never delays or fails the response; a failure, including a missing

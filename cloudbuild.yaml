@@ -1,0 +1,49 @@
+# Continuous deployment of the Cloud Run service (docs/hosting.md): build, push, migrate the
+# production database, deploy. Steps run in order and a failed step ends the build, so a failed
+# migration means no deploy and the previous revision keeps serving.
+steps:
+  - id: Build
+    name: gcr.io/cloud-builders/docker
+    args: [build, -t, $_IMAGE, .]
+  - id: Push
+    name: gcr.io/cloud-builders/docker
+    args: [push, $_IMAGE]
+  # Runs the image just built, so the migrations are the ones of the code about to be deployed.
+  - id: Migrate
+    name: $_IMAGE
+    entrypoint: node
+    args: [/app/server/dist/db/migrate.js]
+    secretEnv: [DATABASE_URL]
+  - id: Deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - services
+      - update
+      - $_SERVICE_NAME
+      - --platform=managed
+      - --image=$_IMAGE
+      - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
+      - --region=$_DEPLOY_REGION
+      - --quiet
+
+images: [$_IMAGE]
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/$PROJECT_ID/secrets/DATABASE_URL/versions/latest
+      env: DATABASE_URL
+
+substitutions:
+  _AR_HOSTNAME: europe-west1-docker.pkg.dev
+  _AR_REPOSITORY: cloud-run-source-deploy
+  _DEPLOY_REGION: europe-west1
+  _SERVICE_NAME: depsie
+  _TRIGGER_ID: 1f0f25c0-7704-4c85-96e6-c320e5fc7083
+  _IMAGE: $_AR_HOSTNAME/$PROJECT_ID/$_AR_REPOSITORY/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  substitutionOption: ALLOW_LOOSE
+  dynamicSubstitutions: true

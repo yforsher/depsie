@@ -1,3 +1,4 @@
+import type { PGlite } from '@electric-sql/pglite';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,18 +7,40 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from './app.js';
 import { claim, comparison, sourceResponse, usage } from './fixtures.js';
 
-// Each analytics write is captured as its values, in the column order of sql/schema.sql:
-// kind, visitor, country, framework, status, prompt_tokens, completion_tokens, cost.
-const db = vi.hoisted(() => ({ inserts: [] as unknown[][], fail: false }));
-vi.mock('@neondatabase/serverless', () => ({
-  neon:
-    () =>
-    async (_sql: TemplateStringsArray, ...values: unknown[]) => {
+// Analytics write to an in-process Postgres built from the migrations (src/db/schema.ts).
+const db = vi.hoisted(() => ({ fail: false, client: undefined as PGlite | undefined }));
+vi.mock('./db/client.js', async () => {
+  const { PGlite } = await import('@electric-sql/pglite');
+  const { drizzle } = await import('drizzle-orm/pglite');
+  const { migrate } = await import('drizzle-orm/pglite/migrator');
+  const { migrationsFolder } = await import('./db/migrations.js');
+  db.client = new PGlite();
+  const testDb = drizzle({ client: db.client });
+  await migrate(testDb, { migrationsFolder });
+  return {
+    db: () => {
       if (db.fail) throw new Error('database unreachable');
-      db.inserts.push(values);
-      return [];
+      return testDb;
     },
-}));
+  };
+});
+
+// Each recorded event as its values: kind, visitor, country, framework, status, prompt_tokens,
+// completion_tokens, cost.
+async function inserts() {
+  const result = await db.client!.query(
+    `select kind, visitor, country, framework, status, prompt_tokens, completion_tokens,
+       cost::float8 as cost from events order by id`,
+    [],
+    { rowMode: 'array' },
+  );
+  return result.rows as unknown[][];
+}
+
+async function waitForInserts(count: number) {
+  await vi.waitFor(async () => expect(await inserts()).toHaveLength(count));
+  return inserts();
+}
 
 const clientDir = mkdtempSync(join(tmpdir(), 'client-dist-'));
 writeFileSync(join(clientDir, 'index.html'), '<div id="root"></div>');
@@ -92,8 +115,8 @@ function aiCalls(fetchMock: ReturnType<typeof mockPipeline>) {
   return fetchMock.mock.calls.filter(([url]) => url.startsWith('https://openrouter.ai')).length;
 }
 
-afterEach(() => {
-  db.inserts = [];
+afterEach(async () => {
+  await db.client!.query('delete from events');
   db.fail = false;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -345,9 +368,9 @@ describe('analytics', () => {
     mockPipeline();
     await request(createApp(clientDir)).post('/api/report').send(reportBody);
 
-    await vi.waitFor(() => expect(db.inserts).toHaveLength(1));
+    const rows = await waitForInserts(1);
     // Supertest connects from localhost, which has no country.
-    expect(db.inserts[0]).toEqual([
+    expect(rows[0]).toEqual([
       'report',
       visitor,
       null,
@@ -366,8 +389,8 @@ describe('analytics', () => {
       .post('/api/report')
       .send({ ...reportBody, need, dependencies: [{ name: 'private-dep-name', range: '^1.0.0' }] });
 
-    await vi.waitFor(() => expect(db.inserts).toHaveLength(1));
-    const recorded = JSON.stringify(db.inserts);
+    const rows = await waitForInserts(1);
+    const recorded = JSON.stringify(rows);
     expect(recorded).not.toContain(need);
     expect(recorded).not.toContain('private-dep-name');
   });
@@ -376,8 +399,8 @@ describe('analytics', () => {
     mockPipeline();
     await request(createApp(clientDir)).post('/api/report').send({ need: '', framework: 'React' });
 
-    await vi.waitFor(() => expect(db.inserts).toHaveLength(1));
-    expect(db.inserts[0]).toEqual(['report', visitor, null, null, 400, 0, 0, 0]);
+    const rows = await waitForInserts(1);
+    expect(rows[0]).toEqual(['report', visitor, null, null, 400, 0, 0, 0]);
   });
 
   it('records a visit when the app shell is served, not for assets', async () => {
@@ -385,8 +408,8 @@ describe('analytics', () => {
     await request(app).get('/');
     await request(app).get('/app.js');
 
-    await vi.waitFor(() => expect(db.inserts).toHaveLength(1));
-    expect(db.inserts[0]).toEqual(['visit', visitor, null, null, null, null, null, null]);
+    const rows = await waitForInserts(1);
+    expect(rows[0]).toEqual(['visit', visitor, null, null, null, null, null, null]);
   });
 
   it('gives the same visitor the same hash within a day', async () => {
@@ -394,8 +417,8 @@ describe('analytics', () => {
     await request(app).get('/');
     await request(app).get('/');
 
-    await vi.waitFor(() => expect(db.inserts).toHaveLength(2));
-    expect(db.inserts[0]![1]).toBe(db.inserts[1]![1]);
+    const rows = await waitForInserts(2);
+    expect(rows[0]![1]).toBe(rows[1]![1]);
   });
 
   it('logs a failed write without affecting the response', async () => {
