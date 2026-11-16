@@ -7,12 +7,10 @@ import { db } from './db/client.js';
 import { events } from './db/schema.js';
 import { log } from './log.js';
 
-// The only fields ever recorded; see src/db/schema.ts and the privacy section in AGENTS.md.
+// The only fields ever recorded; see src/db/schema.ts and the privacy section in AGENTS.md. No
+// tokens or cost: they would equal the sum of a signed-in user's ai_usage rows and link the two.
 interface ReportFields {
   framework: Framework | null;
-  promptTokens: number;
-  completionTokens: number;
-  cost: number;
 }
 
 const reports = new AsyncLocalStorage<ReportFields>();
@@ -42,9 +40,6 @@ async function insert(ip: string, event: Event) {
       country: geoip.lookup(ip)?.country ?? null,
       framework: report?.framework ?? null,
       status: report?.status ?? null,
-      prompt_tokens: report?.promptTokens ?? null,
-      completion_tokens: report?.completionTokens ?? null,
-      cost: report?.cost ?? null,
     });
 }
 
@@ -61,7 +56,7 @@ export function recordVisit(req: Request) {
 }
 
 export const reportAnalytics: RequestHandler = (req, res, next) => {
-  const fields: ReportFields = { framework: null, promptTokens: 0, completionTokens: 0, cost: 0 };
+  const fields: ReportFields = { framework: null };
   res.on('finish', () => record(req, { kind: 'report', status: res.statusCode, ...fields }));
   reports.run(fields, next);
 };
@@ -69,12 +64,4 @@ export const reportAnalytics: RequestHandler = (req, res, next) => {
 export function setFramework(framework: Framework) {
   const fields = reports.getStore();
   if (fields) fields.framework = framework;
-}
-
-export function addUsage(promptTokens: number, completionTokens: number, cost: number) {
-  const fields = reports.getStore();
-  if (!fields) return;
-  fields.promptTokens += promptTokens;
-  fields.completionTokens += completionTokens;
-  fields.cost += cost;
 }

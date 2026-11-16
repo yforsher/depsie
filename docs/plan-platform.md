@@ -129,17 +129,24 @@ Cloud Build expands `$_A/$B` to the first variable only, so substitutions need b
     WebSocket driver)?
   - Better Auth stores the GitHub access token in the `account` table by default, and Depsie does
     not need it after sign-in: can it be left unstored, or else encrypted?
+  - Answers (2026-11-16, Better Auth 1.7): the Drizzle adapter uses interactive transactions only
+    with `transaction: true`, so the Neon HTTP driver works; deleting a user (and in Part 5 a
+    report with its versions) needs no transaction, since every user-owned table references
+    `user.id` with `ON DELETE CASCADE`. The token is not stored: account database hooks clear
+    the access, refresh and ID tokens before the row is written.
 - [ ] Two GitHub OAuth apps, one for local development and one for production (each has one
       callback URL); the GitHub client secret and `BETTER_AUTH_SECRET` in Secret Manager
-- [ ] Better Auth with its Drizzle adapter: sign in with GitHub, requesting only the `read:user`
-      and `user:email` scopes (name, avatar, email; no repository access). Sign-in never asks for
+- [ ] Better Auth with its Drizzle adapter: sign in with GitHub, requesting only the `user:email`
+      scope (name, login and avatar are public; no private profile data, no repository access;
+      `read:user` dropped on 2026-11-16, see Part 4's change). Sign-in never asks for
       repository permissions; if repository access is ever needed, it belongs to a separate GitHub
       App installed on repositories the user picks (agents plan, Later)
 - [ ] Sign-in page: one line on what Depsie reads (name, avatar, email) and that it has no access
       to repositories, that access can be revoked in GitHub settings, and a link to the privacy
       note; anonymous use stays available
 - [ ] Auth handler mounted before `express.json()`; httpOnly, secure, SameSite=Lax session cookie
-- [ ] `GET /api/me` returns the user, or 401
+- [ ] `GET /api/me` returns the user, or `null` without a session (not 401, which browsers log as a
+      console error on every visit; changed 2026-11-16)
 - [ ] Every user-owned table has `user_id`; every query takes it from the session, never from the
       request
 - [ ] Client router (TanStack Router, alongside TanStack Query) for the pages added from here on;
@@ -149,7 +156,7 @@ Cloud Build expands `$_A/$B` to the first variable only, so substitutions need b
       limits are not). A flag can also be a comma-separated list of GitHub logins: on only for
       those signed-in users. While `accounts` is a list, `/signin` works only for listed logins and
       no sign-in button is shown, so the feature can be tested on the live URL
-- [ ] Table `ai_usage` (user_id, source, model, tokens, cost, created_at): every AI
+- [ ] Table `ai_usage` (user_id, source, model, tokens, cost, day): every AI
       call writes one row, including chat turns that change nothing; `user_id` is empty for
       anonymous use. The cost caps and the usage page read only this table
 - [ ] Limits, as constants in one place, tuned later from the usage page (Part 7):
@@ -161,17 +168,21 @@ Cloud Build expands `$_A/$B` to the first variable only, so substitutions need b
 - [ ] Delete account: removes the user, their sessions and all their reports and share links
 
 Tests: the sign-in and account routes return 404 while `accounts` is off and work when it is on
-(the first flagged routes, see Part 2); 401 without a session; user A gets 404 for any report of
-user B; the anonymous report
+(the first flagged routes, see Part 2); `/api/me` is `null` without a session; the anonymous report
 endpoint still works; every AI call writes an `ai_usage` row; the per-user limit and each cost
-cap reject the next request; deleting an account removes all its data.
+cap reject the next request; deleting an account removes all its data. "User A gets 404 for
+any report of user B" moves to Part 5 ("a signed-in report is 404 for other users"), where the
+first user-owned endpoint appears, as Part 2 moved its 404 test.
 
 Success criteria: with `accounts` set to the user's login on the live URL, sign in and out work
 and a second account cannot see the first account's reports; other visitors see no change; the
-GitHub consent screen lists only read access to profile and email.
+GitHub consent screen lists only read access to email addresses.
 
 ## Part 5: Saved reports and links
 
+- [ ] Drop `events.prompt_tokens`, `completion_tokens` and `cost`: no longer written since Part 4
+      (AI usage lives only in `ai_usage`, so `events` cannot be linked to a user), and no running
+      revision writes them by then
 - [ ] Tables `reports` (id, user_id, share_id, need, framework, dependencies, expires_at,
       created_at) and `report_versions` (report_id, version, schema_version, report, source,
       created_at), with tokens and cost in `ai_usage`, which gets a `report_id` column here;

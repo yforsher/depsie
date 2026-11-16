@@ -19,20 +19,20 @@ trigger and set Configuration to "Cloud Build configuration file", location `clo
 The trigger's service account (the default compute account, also used by the Cloud Run service)
 already reads the `DATABASE_URL` secret.
 
-| Setting           | Value                                                                                                                          |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Source            | This GitHub repo, branch `master`; build type Dockerfile                                                                       |
-| Region            | A Tier 1 region (for example `europe-west1` or `us-central1`); Tier 2 costs about 1.4 times more                               |
-| Authentication    | Allow public access                                                                                                            |
-| Billing           | Instance-based, so the analytics writes after a response still get CPU (request-based billing gives CPU only during a request) |
-| Minimum instances | 0 scales to zero, with a cold start of a few seconds; 1 keeps an instance warm                                                 |
-| Maximum instances | 1, so every request reaches the instance that holds the in-memory rate limit and salt                                          |
-| Startup CPU boost | On, for shorter cold starts                                                                                                    |
-| CPU and memory    | 1 vCPU, 512 MiB                                                                                                                |
-| Request timeout   | Default 300 seconds, above the 90 second report deadline                                                                       |
-| Secrets           | `OPENROUTER_API_KEY`, `GITHUB_TOKEN`, `DATABASE_URL` (Neon `production` branch), from Secret Manager                           |
-| Health check      | Startup probe on HTTP `/api/health`                                                                                            |
-| Budget alert      | Monthly alert in Cloud Billing, since pay-as-you-go has no hard cap                                                            |
+| Setting           | Value                                                                                                                                                                                                                        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source            | This GitHub repo, branch `master`; build type Dockerfile                                                                                                                                                                     |
+| Region            | A Tier 1 region (for example `europe-west1` or `us-central1`); Tier 2 costs about 1.4 times more                                                                                                                             |
+| Authentication    | Allow public access                                                                                                                                                                                                          |
+| Billing           | Instance-based, so the analytics writes after a response still get CPU (request-based billing gives CPU only during a request)                                                                                               |
+| Minimum instances | 0 scales to zero, with a cold start of a few seconds; 1 keeps an instance warm                                                                                                                                               |
+| Maximum instances | 1, so every request reaches the instance that holds the in-memory rate limit and salt                                                                                                                                        |
+| Startup CPU boost | On, for shorter cold starts                                                                                                                                                                                                  |
+| CPU and memory    | 1 vCPU, 512 MiB                                                                                                                                                                                                              |
+| Request timeout   | Default 300 seconds, above the 90 second report deadline                                                                                                                                                                     |
+| Secrets           | `OPENROUTER_API_KEY`, `GITHUB_TOKEN`, `DATABASE_URL` (Neon `production` branch), `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `BETTER_AUTH_SECRET`, from Secret Manager; `BETTER_AUTH_URL` (the live URL) as a plain variable |
+| Health check      | Startup probe on HTTP `/api/health`                                                                                                                                                                                          |
+| Budget alert      | Monthly alert in Cloud Billing, since pay-as-you-go has no hard cap                                                                                                                                                          |
 
 Cost: with minimum instances 0, usage at this traffic stays within Cloud Run's monthly allowance
 (240,000 vCPU-seconds and 450,000 GiB-seconds with instance-based billing). Minimum instances 1
@@ -46,6 +46,32 @@ one rate limit.
 Uptime: `.github/workflows/uptime.yml` calls `/api/health` every 6 hours, and GitHub emails when it
 fails. Cloud Monitoring uptime checks are not used: they run at least every 15 minutes, which would
 keep the instance up and billed all month.
+
+## Sign-in (GitHub OAuth)
+
+Sign-in exists while `FEATURE_ACCOUNTS` is `on` or a list of GitHub logins; with it unset, none of
+this is read. Two GitHub OAuth apps (GitHub, Settings, Developer settings, OAuth Apps), since each
+has one callback URL:
+
+| App        | Homepage URL               | Authorization callback URL                          |
+| ---------- | -------------------------- | --------------------------------------------------- |
+| Local      | `http://localhost:5173`    | `http://localhost:5173/api/auth/callback/github`    |
+| Production | `https://depsie.cloud.run` | `https://depsie.cloud.run/api/auth/callback/github` |
+
+The local app's ID and secret go in `.env`; the production app's in Secret Manager as
+`GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`, with a new random `BETTER_AUTH_SECRET` (at least
+32 characters; changing it signs everyone out). `BETTER_AUTH_URL` is the origin the browser uses:
+the live URL in production, the Vite dev server locally. The OpenRouter key also has a credit limit
+set in OpenRouter, as a backstop to the daily cost caps in `server/src/limits.ts`.
+
+Sign-in works only on the URL in `BETTER_AUTH_URL` and the production OAuth app's callback,
+`https://depsie.cloud.run`. The service also answers at its Cloud Run address
+(`https://depsie-kud34vyt4q-ew.a.run.app`, the default of the "Smoke live" workflow); there the app
+works, but sign-in fails Better Auth's origin check, so use `depsie.cloud.run` to sign in.
+
+To try sign-in on the live URL before it opens to everyone, set `FEATURE_ACCOUNTS=<your login>` on
+the service and open `/signin`; no sign-in button is shown to anyone else. Set it back to `off` (or empty)
+afterwards.
 
 ## Sources
 

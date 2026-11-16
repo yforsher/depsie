@@ -143,6 +143,16 @@ describe('App', () => {
       'Too many reports: the limit is 10 per hour. Please try again later.',
     ],
     [
+      429,
+      { error: 'The daily limit for reports was reached; it resets at midnight UTC.' },
+      'The daily limit for reports was reached; it resets at midnight UTC. Please try again later.',
+    ],
+    [
+      503,
+      { error: 'Reports are unavailable right now.' },
+      'Reports are unavailable right now. Please try again later.',
+    ],
+    [
       502,
       { error: 'The AI step failed: Model cited a field that was not fetched' },
       'The AI could not produce a valid report this time. Please try again.',

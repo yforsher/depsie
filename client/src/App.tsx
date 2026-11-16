@@ -10,11 +10,7 @@ export function App() {
   return (
     <main>
       <header className="app-header">
-        <h1>
-          <img src="/logo.svg" alt="" />
-          Depsie
-        </h1>
-        <p>Describe what you need and get a ranked, sourced comparison of npm packages.</p>
+        <h1>Describe what you need and get a ranked, sourced comparison of npm packages.</h1>
       </header>
       <div className="columns">
         <RequestForm onSubmit={report.mutate} isPending={report.isPending} />

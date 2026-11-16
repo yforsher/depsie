@@ -24,9 +24,9 @@ cp .env.example .env   # then fill in the keys
 pnpm dev
 ```
 
-Analytics are written to a Neon Postgres database: create the tables once, and after each new
-migration, with `pnpm --filter server db:migrate`. Without `DATABASE_URL` the app still works and
-logs each failed analytics write.
+Reports need a database, for the daily AI cost caps. Set `DATABASE_URL=memory` in `.env` for an
+in-memory database built at startup (empty on every start), or a Neon Postgres connection string:
+create its tables once, and after each new migration, with `pnpm --filter server db:migrate`.
 
 To run the built app, as in production:
 
@@ -38,9 +38,12 @@ pnpm --filter server start   # http://localhost:3000
 ## Privacy
 
 The server stores anonymous usage counts only: visits and reports with the time, country,
-framework, status, and AI tokens and cost. Unique visitors per day come from a hash of the IP with a
+framework and status. Unique visitors per day come from a hash of the IP with a
 salt that is replaced daily and never stored. No cookies, no IP addresses, and never the need text,
-dependency names or the report. See `server/src/db/schema.ts`.
+dependency names or the report. To enforce daily cost limits, the tokens and cost of each AI call
+are stored with the day only, not the time. Signing in with GitHub, where available, stores your
+GitHub name, login, avatar and email and sets a session cookie; no GitHub token and no IP address
+are kept, and deleting the account deletes all of it. See `server/src/db/schema.ts`.
 
 ## Test
 

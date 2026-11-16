@@ -8,11 +8,16 @@ The server is the only place that holds API keys (`OPENROUTER_API_KEY`, `GITHUB_
 ## Endpoints
 
 - `GET /api/health` returns `{ status: "ok" }`.
-- `GET /api/features` returns the enabled feature flags, `{ enabled: Feature[] }`.
+- `GET /api/features` returns the flags on for the caller and whether sign-in exists,
+  `{ enabled: Feature[], signIn: boolean }`.
+- `/api/auth/*` (Better Auth: GitHub sign-in, sign-out, delete account) and `GET /api/me` (the
+  signed-in user, or `null`: not 401, which browsers log as a console error) exist only while
+  `accounts` is not off.
 - `POST /api/report` is the only report endpoint. It validates `{ need, framework, dependencies? }`
   with Zod (with input size limits), then runs the whole pipeline and returns the report. There is
   no endpoint per stage, so clients cannot trigger AI call 2 with their own candidate list.
-- `POST /api/report` has a per-IP rate limit to keep costs predictable.
+- `POST /api/report` has an hourly rate limit (per signed-in user, else per IP) and daily AI cost
+  caps (per user, and one shared by all anonymous use) to keep costs predictable.
 - In production, Express also serves the built client (`client/dist`) with SPA fallback.
 
 ## AI usage
@@ -56,6 +61,8 @@ failing the request.
 - Anonymous analytics go to one `events` table in Neon Postgres (`src/db/schema.ts`). The
   `production` branch is production, the `dev` branch is for local runs. Only the columns in that
   file are written.
+- `ai_usage` (`src/db/schema.ts`): one row per AI call, with the signed-in user or none; the cost
+  caps read only this table. It is separate from `events`, which is never linked to users.
 - Schema changes: edit `src/db/schema.ts`, run `pnpm db:generate`, and commit the generated
   migration in `drizzle/` with the pull request. Never `drizzle-kit push`, never change the
   `production` branch by hand. Migrations only go forward: no down migrations; a mistake is
@@ -80,25 +87,48 @@ failing the request.
   return 404.
 - `src/index.ts`: entry point; listens on `PORT` (default 3000) and serves `client/dist`.
 - `src/features.ts`: feature flags. The names are `features` in `shared/`; `FEATURE_<NAME>=on`
-  (dashes as underscores) turns one on, and anything else leaves it off, so production is off
-  unless set and `.env.example` turns them on for local development. `createApp()` reads them
-  once at startup. Put a route behind a flag by registering it in `createApp()` only when the
-  flag is on (`if (enabled.includes('accounts')) app.use(...)`): while the flag is off the route
-  does not exist and gets the same 404 as an unknown API path, however it is mounted.
+  (dashes as underscores) turns one on, and unset, empty or `off` leaves it off, so production is off
+  unless set and `.env.example` turns them on for local development. Any other value of
+  `FEATURE_ACCOUNTS` is a comma-separated list of GitHub logins (any case): on only for those
+  signed-in users. To test sign-in on the live URL, set `FEATURE_ACCOUNTS=<your login>` on Cloud
+  Run and open `/signin` (no button is shown). `readFlags()` reads them once at startup;
+  `enabledFor(flags, login)` answers for one caller. Put a route behind a flag by registering it
+  in `createApp()` only when the flag is not off: while it is off the route does not exist and
+  gets the same 404 as an unknown API path, however it is mounted. Routes of signed-in users also
+  take `requireAccounts`, which gives that same 404 to anyone the flag is not on for.
+- `src/auth.ts`: `createAuth()` builds Better Auth (Drizzle adapter, no transactions: user-owned
+  rows reference `user.id` with `ON DELETE CASCADE`, so one delete removes a user's data). GitHub
+  only, scope `user:email` (name, login and avatar are public profile data, readable with any
+  token); `getUserInfo` reads `/user` and `/user/emails`, keeps
+  the verified primary email and the login (`githubLogin`), and returns null for a login the
+  `accounts` list does not include, so no user or session is created. Account hooks clear the
+  GitHub tokens before the row is written: Depsie stores none. `/update-user` is disabled, since
+  `githubLogin` decides the flag; the profile is refreshed at each sign-in. A session hook clears
+  the IP address and User-Agent Better Auth would store with each session. Settings: `BETTER_AUTH_URL`, `BETTER_AUTH_SECRET`,
+  `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`. Tests pass Better Auth's `testUtils` plugin to
+  create users and sessions directly.
+- `src/users.ts`: `loadUser(auth)` puts the session's user in `res.locals.user` (the only source of
+  the user: never an id from the request), forwards the renewed session cookie Better Auth sends
+  when it extends a session, and answers 503 when the session cannot be read (database down).
 - `src/log.ts`: `log()` prints one line prefixed with the request ID, kept in an
   `AsyncLocalStorage` set by the `requestLogging` middleware on `POST /api/report`, so pipeline
   code can log without passing the ID around. Lines: request received, each AI call (duration,
   tokens, cost), data fetched (failed sources), the failed step and reason, response sent (status,
   total duration). Never the need text or dependency names.
 - `src/analytics.ts`: records a `visit` when the app shell is served and a `report` row when a
-  `POST /api/report` response finishes (any status, including 400 and 429), with the framework
-  and the summed tokens and cost of the AI calls (`addUsage()` from `chatJson()`). The visitor is
+  `POST /api/report` response finishes (any status, including 400 and 429), with the framework,
+  and no tokens or cost: those are only in `ai_usage`, where they would otherwise let a
+  signed-in user's calls be matched to this anonymous row (its old token and cost columns are
+  no longer written and are dropped in Part 5). The visitor is
   a SHA-256 hash of the IP with a salt kept in memory and replaced each UTC day; country comes
   from `geoip-country` (bundled GeoLite2 data, no outside call). Writes go through `db()` from
   `src/db/client.ts` (Drizzle on the Neon HTTP driver), are not awaited and only log on failure,
   so analytics never delay or fail a response.
-- `src/db/`: `schema.ts` (Drizzle tables), `client.ts` (`db()`, built on each call so a missing
-  `DATABASE_URL` fails only that write), `migrations.ts` (the `drizzle/` folder path) and
+- `src/db/`: `schema.ts` (Drizzle tables), `client.ts` (`db()`, created on first use so a
+  missing `DATABASE_URL` fails that query, not server start; `openDatabase()`, awaited by
+  `index.ts` at startup, builds an in-memory PGlite with the migrations when
+  `DATABASE_URL=memory`, for local runs and the e2e server, which sets it when unset; PGlite is a
+  dev dependency imported only there), `migrations.ts` (the `drizzle/` folder path) and
   `migrate.ts` (applies pending migrations in one transaction over the Neon WebSocket pool; run by
   `pnpm db:migrate` and, compiled, by the deploy). Migrations are in `drizzle/`, generated by
   `pnpm db:generate` from `drizzle.config.ts`.
@@ -138,9 +168,21 @@ failing the request.
 - `trust proxy` is `1`: the host's proxy (Cloud Run, see `docs/hosting.md`) appends the client IP
   to `X-Forwarded-For`, so `req.ip` (used by the rate limit and analytics) is its last entry and a
   client cannot fake it.
-- `POST /api/report` in `src/app.ts`: rate limited to 10 per hour per IP (429), Zod validation
-  (400), then `generateReport()`; `AiError` becomes 502 with the message, and the rejected model
-  output is logged to the console (never stored) so failures can be investigated.
+- `POST /api/report` in `src/app.ts`: rate limited to 10 per hour per signed-in user, else per IP
+  (429), then the daily cost cap (`checkCostCap`), Zod validation (400), then `generateReport()`; `AiError` becomes 502
+  with the message, and the rejected model output is logged to the console (never stored) so
+  failures can be investigated.
+- `src/limits.ts`: every limit on reports as a constant (reports per hour, the daily AI cost cap of
+  $0.25 per signed-in user and $1 shared by all anonymous use) and `checkCostCap`, which sums
+  today's (UTC) `ai_usage.cost` for the user, or for all anonymous use, before any AI call: 429 at
+  or above the cap, 503 when the database cannot be reached, so no report runs unchecked.
+  `loadUser` also answers 503 when the session cannot be read.
+- `src/usage.ts`: `recordAiUsage()`, called by `chatJson()` as soon as OpenRouter reports the
+  usage (so a rejected answer still counts), writes one `ai_usage` row per AI call (source is the
+  step name, model, tokens, cost, and the UTC day only, not the time, so a user's calls cannot be
+  matched by time to the anonymous `events` rows); not awaited and only logged on failure. The
+  user comes from its own AsyncLocalStorage (`usageUser`), separate from analytics, so `events`
+  never sees a user.
 - `src/fixtures/`: trimmed real responses. `src/fixtureResponses.ts` serves them by URL, builds
   a valid AI call 2 answer, and has `fakeFetch()`, which answers every outside call of a whole
   report (each AI call by the schema name it asks for). `src/fixtures.ts` re-exports it and adds

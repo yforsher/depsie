@@ -45,12 +45,14 @@ step limit and a cost cap enforced in code.
   an account deletes all its data.
   Package data is not cached.
 - Anonymous activity analytics: visits, report count, framework, success or error status,
-  time, country, and AI tokens and cost per report. Unique visitors are counted per day with a
+  time and country. AI tokens and cost are recorded only in `ai_usage` (per AI call, with the day
+  but not the time), so they cannot link a signed-in user to an `events` row. Unique visitors are counted per day with a
   hash of the IP and a random salt that is replaced daily and never stored, so visitors cannot be
   identified or followed across days. No IP addresses stored, and never the need text, dependency
   names or the report. The `events` table is never linked to users or reports; per-user numbers
   come from the account tables.
-- The only cookie is the session cookie set after signing in.
+- The only cookies are the session cookie set after signing in, and a short-lived (5 minute) state
+  cookie while a sign-in is under way, which protects it against forgery.
 - Permissions, limits and data rules are enforced in code, never by the model.
 - New features stay behind feature flags until turned on; `docs/plan-platform.md` and
   `docs/plan-agents.md` record which flags are on.

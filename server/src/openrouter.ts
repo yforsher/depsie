@@ -1,6 +1,6 @@
 import * as z from 'zod';
-import { addUsage } from './analytics.js';
 import { log, secondsSince } from './log.js';
+import { recordAiUsage } from './usage.js';
 
 // OPENROUTER_MODEL is set only for the model comparison runs; production leaves it unset.
 export const MODEL = process.env.OPENROUTER_MODEL ?? 'openai/gpt-6-luna';
@@ -84,7 +84,7 @@ export async function chatJson<T extends z.ZodType>(
     usage: Usage;
   };
   const { prompt_tokens, completion_tokens, cost } = data.usage;
-  addUsage(prompt_tokens, completion_tokens, cost);
+  recordAiUsage(name, MODEL, prompt_tokens, completion_tokens, cost);
   log(
     `${name} done in ${secondsSince(start)} by ${data.provider}: ${prompt_tokens} prompt + ${completion_tokens} completion tokens, $${cost.toFixed(5)}`,
   );
