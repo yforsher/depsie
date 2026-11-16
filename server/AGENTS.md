@@ -65,7 +65,9 @@ failing the request.
   records the hand-made `events` table on `production` and `dev` without changing it.
 - CI: on each pull request, the `db` job in `.github/workflows/ci.yml` creates the Neon branch
   `pr-<number>` from `production`, runs `db:migrate` and the server tests on it, and deletes it
-  however the job ends. It needs `NEON_API_KEY` (secret) and `NEON_PROJECT_ID` (variable).
+  however the job ends. It needs `NEON_API_KEY` (secret) and `NEON_PROJECT_ID` (variable). The
+  `check` job runs `db:generate` and fails if it leaves changes in `drizzle/`, so a schema edit
+  without its committed migration cannot merge.
 - Tests use PGlite (in-process Postgres) built from the same migrations: no network, no running
   service, a fresh database per test file. Chosen over a Neon branch per developer (needs network
   and a branch per run) and Postgres in Docker (a container to start before every test run). The Neon
