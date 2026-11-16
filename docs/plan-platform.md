@@ -82,23 +82,23 @@ in production (`GET /api/features` returns `{"enabled":[]}`).
 
 ## Part 3: Drizzle ORM and migrations
 
-- [ ] Drizzle ORM and drizzle-kit on top of the existing Neon driver
-- [ ] Describe the existing `events` table in a Drizzle schema; the first migration matches
+- [x] Drizzle ORM and drizzle-kit on top of the existing Neon driver
+- [x] Describe the existing `events` table in a Drizzle schema; the first migration matches
       `server/sql/schema.sql` with no change to the live table
-- [ ] `db:generate` and `db:migrate` scripts; every schema change is a generated SQL migration
+- [x] `db:generate` and `db:migrate` scripts; every schema change is a generated SQL migration
       committed with the pull request; never `drizzle-kit push` and never by hand on `main`
-- [ ] CI on each pull request: create a Neon branch, run the migrations on it, run the tests
+- [x] CI on each pull request: create a Neon branch, run the migrations on it, run the tests
       against it, and delete the branch also when the tests fail (the free plan limits the number
       of branches)
-- [ ] Deploy after merge: deploys run through Cloud Build continuous deployment
+- [x] Deploy after merge: deploys run through Cloud Build continuous deployment
       (`docs/hosting.md`), so add a `cloudbuild.yaml` with build, migrate on production, then
       deploy; a failed migration stops the deploy
-- [ ] Migrations must work with the code that is still running: add first, remove in a later
+- [x] Migrations must work with the code that is still running: add first, remove in a later
       deploy; no down migrations, a mistake is fixed with a new migration
-- [ ] Local development and tests database: choose between a Neon branch per developer, Postgres
+- [x] Local development and tests database: choose between a Neon branch per developer, Postgres
       in Docker or PGlite, by test speed and closeness to production; record the choice in
       `server/AGENTS.md`
-- [ ] Move analytics inserts to Drizzle; remove `server/sql/schema.sql` and update every reference
+- [x] Move analytics inserts to Drizzle; remove `server/sql/schema.sql` and update every reference
       to it: the `.env.example` comment, the README setup step (run `pnpm db:migrate` instead of
       the SQL file in the Neon SQL editor) and privacy section, `server/AGENTS.md`, and the
       comments in `server/src/analytics.ts` and `server/src/app.test.ts` (point to the Drizzle
@@ -110,6 +110,16 @@ Success criteria: a fresh Neon branch built only from migrations matches product
 request with a schema change runs its migration on its own Neon branch in CI; after merge, the
 migration runs before the new revision is deployed, and analytics still writes rows on the live
 URL.
+
+Done 2026-11-16 (PR #11, fix in PR #12): a fresh database built only from migrations has the same
+`events` schema as production (columns, identity, defaults, constraints). The `db` job runs the
+migrations and the server tests on Neon branch `pr-<number>` (about 30 seconds) and deletes it,
+also when a test fails; the `check` job fails when the schema changes without its migration. The
+deploy runs Build, Push, Migrate (3 seconds), Deploy (about 2 minutes in all); production recorded
+one migration and kept its 66 `events` rows, "Smoke live" passed (2 tests in 35 seconds), and the
+run added two visits and one report row. Tests use PGlite (`server/AGENTS.md`). The Neon
+production branch is named `production`. The first run of the switched trigger failed at Push:
+Cloud Build expands `$_A/$B` to the first variable only, so substitutions need braces.
 
 ## Part 4: Accounts and limits
 

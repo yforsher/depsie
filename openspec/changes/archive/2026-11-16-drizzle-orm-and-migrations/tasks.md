@@ -25,13 +25,13 @@
 
 ## 5. Deploy with migrations
 
-- [ ] 5.1 Load superpowers:test-driven-development with the Skill tool. Check the current Cloud Build and Cloud Run deploy docs, then add `cloudbuild.yaml`: build, push, run `node server/dist/db/migrate.js` in the image with `DATABASE_URL` from Secret Manager, then `gcloud run deploy` with the same image, keeping the trigger's existing substitutions. Load superpowers:verification-before-completion with the Skill tool and run its check: the first Cloud Build run after merge passes its Migrate step (no local Docker build: a missing file fails that step, which stops the deploy and keeps the previous revision serving)
-- [ ] 5.2 Document in `docs/hosting.md` the console steps (switch the trigger to `cloudbuild.yaml`; its service account already reads the `DATABASE_URL` secret) and the order build, migrate, deploy; ask the user to do the console steps; verify the trigger shows `cloudbuild.yaml` as its configuration
+- [x] 5.1 Load superpowers:test-driven-development with the Skill tool. Check the current Cloud Build and Cloud Run deploy docs, then add `cloudbuild.yaml`: build, push, run `node server/dist/db/migrate.js` in the image with `DATABASE_URL` from Secret Manager, then `gcloud run deploy` with the same image, keeping the trigger's existing substitutions. Load superpowers:verification-before-completion with the Skill tool and run its check: the first Cloud Build run after merge passes its Migrate step (no local Docker build: a missing file fails that step, which stops the deploy and keeps the previous revision serving)
+- [x] 5.2 Document in `docs/hosting.md` the console steps (switch the trigger to `cloudbuild.yaml`; its service account already reads the `DATABASE_URL` secret) and the order build, migrate, deploy; ask the user to do the console steps; verify the trigger shows `cloudbuild.yaml` as its configuration
 
 ## 6. Integration
 
 - [x] 6.1 Build a fresh database only from migrations (a new empty database on the `dev` branch, `pnpm db:migrate`) and compare its `events` schema with production (`production`); verify there are no differences, then drop the empty database
-- [ ] 6.2 After merge, verify the Cloud Build run shows the migrate step before the deploy step, `drizzle.__drizzle_migrations` on `production` has one row and `events` kept its rows, "Smoke live" passes, and a visit to the live URL adds a row to `events`
+- [x] 6.2 After merge, verify the Cloud Build run shows the migrate step before the deploy step, `drizzle.__drizzle_migrations` on `production` has one row and `events` kept its rows, "Smoke live" passes, and a visit to the live URL adds a row to `events`
 
 ## 7. Code review
 
