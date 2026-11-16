@@ -27,16 +27,29 @@ body {
 main {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 32px 16px;
+  padding: 16px 16px 32px;
   display: grid;
   gap: 24px;
 }
 
-.app-header h1 {
+/* The top bar of every page, in the same column as the content: the wordmark, which leads home,
+   and the account control at the other end. */
+.site-bar {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 16px 0;
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand {
+  display: inline-flex;
   align-items: baseline;
   gap: 0.3em;
-  margin: 0;
+  color: var(--text);
+  text-decoration: none;
   /* Rounded letters to match the logo; self-hosted, so loading it sends no request elsewhere. */
   font-family: 'Nunito Variable', system-ui, sans-serif;
   font-size: 2.25rem;
@@ -45,15 +58,23 @@ main {
   letter-spacing: -0.03em;
 }
 
+.brand:hover {
+  color: var(--text);
+}
+
 /* Runs from cap height to baseline like the letters: baseline alignment puts the image's bottom on
    the text baseline, and 0.7em is the cap height of Nunito. */
-.app-header h1 img {
+.brand img {
   width: 0.7em;
   height: 0.7em;
 }
 
-.app-header p {
-  margin: 6px 0 0;
+/* The home page's heading is its one-line description, set as body text under the wordmark. */
+.app-header h1 {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 400;
 }
 
 .columns {
@@ -543,5 +564,180 @@ summary {
 }
 
 .status-danger {
+  color: var(--danger);
+}
+
+/* The right end of the top bar: Sign in, or the avatar with its menu. */
+.account-menu {
+  position: relative;
+  z-index: 1;
+}
+
+/* A quiet secondary button in the style of the inputs, so the accent stays on each page's main
+   action. */
+.sign-in-link {
+  display: inline-block;
+  padding: 8px 16px;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.sign-in-link:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.account-menu .avatar-button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.account-menu .avatar-button:hover,
+.account-menu .avatar-button[aria-expanded='true'] {
+  background: var(--surface-raised);
+  border-color: var(--accent);
+}
+
+.account-menu .avatar-button img {
+  width: 100%;
+  height: 100%;
+}
+
+.account-menu-items {
+  position: absolute;
+  right: 0;
+  margin: 8px 0 0;
+  padding: 8px;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  min-width: 160px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.account-menu-items a,
+.account-menu-items button {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 4px;
+  text-align: left;
+  text-decoration: none;
+  font-weight: 400;
+  color: var(--text);
+  background: none;
+}
+
+.account-menu-items a:hover,
+.account-menu-items button:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+/* Sign-in and account pages: panels in one narrow column, lined up with the wordmark. */
+.narrow {
+  justify-items: start;
+  gap: 16px;
+}
+
+.narrow > .panel {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 480px;
+  padding: 24px;
+}
+
+.stack {
+  display: grid;
+  gap: 12px;
+}
+
+.stack p {
+  margin: 0;
+}
+
+.stack h1 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.stack h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.github-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  justify-self: stretch;
+  margin-top: 4px;
+}
+
+.page-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  font-size: 0.875rem;
+}
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.profile-avatar {
+  width: 56px;
+  height: 56px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+}
+
+.profile-name {
+  color: var(--text);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+/* Deleting is the one destructive action: outlined until confirmed, then filled. */
+.danger-outline-button {
+  color: var(--danger);
+  background: none;
+  border: 1px solid var(--danger);
+}
+
+.danger-outline-button:hover {
+  color: var(--on-accent);
+  background: var(--danger);
+}
+
+.danger-button {
+  color: var(--on-accent);
+  background: var(--danger);
+}
+
+.danger-button:hover {
+  background: var(--danger);
+  text-decoration: underline;
+}
+
+.error-text {
   color: var(--danger);
 }

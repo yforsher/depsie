@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from './app.js';
+import { MODEL } from './openrouter.js';
 import { claim, comparison, sourceResponse, usage } from './fixtures.js';
 
 // Analytics write to an in-process Postgres built from the migrations (src/db/schema.ts).
@@ -115,8 +116,17 @@ function aiCalls(fetchMock: ReturnType<typeof mockPipeline>) {
   return fetchMock.mock.calls.filter(([url]) => url.startsWith('https://openrouter.ai')).length;
 }
 
+async function aiUsageRows() {
+  const result = await db.client!.query(
+    `select user_id, source, model, prompt_tokens, completion_tokens, cost::float8 as cost
+     from ai_usage order by id`,
+  );
+  return result.rows;
+}
+
 afterEach(async () => {
   await db.client!.query('delete from events');
+  await db.client!.query('delete from ai_usage');
   db.fail = false;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -361,25 +371,85 @@ describe('POST /api/report logging', () => {
   });
 });
 
+describe('AI usage', () => {
+  const row = (source: string) => ({
+    user_id: null,
+    source,
+    model: MODEL,
+    prompt_tokens: usage.prompt_tokens,
+    completion_tokens: usage.completion_tokens,
+    cost: usage.cost,
+  });
+
+  it('writes one row per AI call of an anonymous report, with no user', async () => {
+    mockPipeline();
+    await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    await vi.waitFor(async () => expect(await aiUsageRows()).toHaveLength(2));
+    expect(await aiUsageRows()).toEqual([row('query_expansion'), row('comparison')]);
+  });
+
+  it('writes the row of a call whose answer is rejected', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockPipeline({ not: 'a comparison' });
+    const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    expect(response.status).toBe(502);
+    await vi.waitFor(async () => expect(await aiUsageRows()).toHaveLength(2));
+    expect((await aiUsageRows())[1]).toEqual(row('comparison'));
+  });
+});
+
+describe('daily cost cap', () => {
+  async function spend(cost: number, day = "(now() at time zone 'utc')::date") {
+    await db.client!.query(
+      `insert into ai_usage (user_id, source, model, prompt_tokens, completion_tokens, cost, day)
+       values (null, 'comparison', 'm', 1, 1, $1, ${day})`,
+      [cost],
+    );
+  }
+
+  it('refuses an anonymous report once anonymous use has spent $1 today, with no AI call', async () => {
+    const fetchMock = mockPipeline();
+    await spend(1);
+    const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    expect(response.status).toBe(429);
+    expect(response.body.error).toContain('daily');
+    expect(aiCalls(fetchMock)).toBe(0);
+  });
+
+  it('does not count earlier days', async () => {
+    mockPipeline();
+    await spend(5, "(now() at time zone 'utc')::date - 1");
+    const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    expect(response.status).toBe(200);
+  });
+
+  it('refuses with 503 and no AI call when the database cannot be reached', async () => {
+    const fetchMock = mockPipeline();
+    db.fail = true;
+    const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    expect(response.status).toBe(503);
+    expect(response.body.error).toContain('unavailable');
+    expect(aiCalls(fetchMock)).toBe(0);
+  });
+});
+
 describe('analytics', () => {
   const visitor = expect.stringMatching(/^[0-9a-f]{16}$/);
 
-  it('records a report with only the allowed fields and the usage of both AI calls', async () => {
+  // Intended change: no tokens or cost in events. They equal the sum of the report's ai_usage rows,
+  // so a signed-in user's rows could be matched to this anonymous row; ai_usage holds them alone.
+  it('records a report with only the allowed fields, and no tokens or cost', async () => {
     mockPipeline();
     await request(createApp(clientDir)).post('/api/report').send(reportBody);
 
     const rows = await waitForInserts(1);
     // Supertest connects from localhost, which has no country.
-    expect(rows[0]).toEqual([
-      'report',
-      visitor,
-      null,
-      'React',
-      200,
-      2 * usage.prompt_tokens,
-      2 * usage.completion_tokens,
-      2 * usage.cost,
-    ]);
+    expect(rows[0]).toEqual(['report', visitor, null, 'React', 200, null, null, null]);
   });
 
   it('never records the need text or dependency names', async () => {
@@ -400,7 +470,7 @@ describe('analytics', () => {
     await request(createApp(clientDir)).post('/api/report').send({ need: '', framework: 'React' });
 
     const rows = await waitForInserts(1);
-    expect(rows[0]).toEqual(['report', visitor, null, null, 400, 0, 0, 0]);
+    expect(rows[0]).toEqual(['report', visitor, null, null, 400, null, null, null]);
   });
 
   it('records a visit when the app shell is served, not for assets', async () => {

@@ -1,10 +1,14 @@
 import request from 'supertest';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from './app.js';
+import { openDatabase } from './db/client.js';
 import { fakeFetch } from './fixtureResponses.js';
 
-// Analytics writes are not part of this test.
-vi.mock('@neondatabase/serverless', () => ({ neon: () => async () => [] }));
+// The in-memory database the e2e server uses: reports need one for the cost caps.
+beforeAll(async () => {
+  vi.stubEnv('DATABASE_URL', 'memory');
+  await openDatabase();
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();

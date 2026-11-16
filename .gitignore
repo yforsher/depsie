@@ -3,3 +3,6 @@ dist
 .env
 playwright-report
 test-results
+
+# Playwright MCP screenshots and logs
+.playwright-mcp/

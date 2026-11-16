@@ -1,6 +1,7 @@
 # Client
 
-React, TypeScript, Vite, TanStack Query. Tests with Vitest and React Testing Library.
+React, TypeScript, Vite, TanStack Query, TanStack Router. Tests with Vitest and React Testing
+Library.
 
 The client handles the need + framework form, parses package.json locally, shows the "what is
 sent" preview, renders the report, and exports it as Markdown. The Markdown is built from the
@@ -22,8 +23,10 @@ structured report in code, without an AI call.
 ## Server API
 
 A single `POST /api/report` call with `{ need, framework, dependencies? }` (types in `shared/`),
-and `GET /api/features` for the enabled feature flags.
-Show a clear message for each error: 400 (invalid input), 429 (rate limit), 502 (AI failure).
+and `GET /api/features` for the flags on for this visitor and `signIn` (sign-in exists, so
+`/signin` is shown even while no sign-in button is).
+Show a clear message for each error: 400 (invalid input), 429 (hourly or daily limit), 502 (AI
+failure), 503 (reports unavailable while the database is down).
 
 ## Color scheme
 
@@ -69,15 +72,40 @@ label or icon, never color alone.
 
 ## Code structure
 
-- `src/main.tsx`: entry point with the TanStack Query provider.
+- `src/main.tsx`: entry point with the TanStack Query and Router providers.
+- `src/router.tsx`: code-based routes. The root route renders the top bar of every page: the
+  Depsie wordmark (a link home) and the account menu, in the content column;
+  `/` is the report app; `/signin` is the sign-in page while sign-in exists, and redirects home
+  otherwise; `/account` is the signed-in user's page, and redirects anyone else to `/signin`
+  while sign-in exists, else home. Any unknown path redirects home (the root route's
+  `notFoundComponent`). Redirects replace the history entry, so Back does not return to them.
+  Pages that depend on the flags or the user render nothing until both are known, so a
+  signed-in user is never sent away by mistake. The server returns the app shell for every non-API path.
+- `src/account.ts`: the Better Auth React client (`authClient`, for sign-in, sign-out and delete;
+  it looks up `fetch` on each call so tests can stub it) and `useMe()`, which reads
+  `GET /api/me` only while `accounts` is on for this visitor.
+- `src/components/AccountMenu.tsx`: the right end of the top bar, only while `accounts` is on for
+  this visitor: a Sign in link styled as a quiet secondary button (not on `/signin` or `/account`),
+  or the avatar with a menu (Account, Sign out). Signing out reads the
+  flags and the user again, since a login list can depend on the user.
+- `src/components/SignInPage.tsx`: what Depsie reads (name, avatar, email), no repository access,
+  how to revoke it in GitHub, the privacy note, a way back, in one panel; the GitHub button
+  (`GitHubMark.tsx` is GitHub's mark) starts Better Auth's GitHub sign-in, returns to `/` also when
+  sign-in is refused, and is disabled after one click so a second click starts no second sign-in.
+- `src/components/AccountPage.tsx`: the profile (avatar, name, login, email) in one panel and
+  Delete account in another, outlined in the danger color until confirmed, then filled;
+  when Better Auth asks for a recent sign-in (`SESSION_EXPIRED`) it says to sign in again.
+- `src/testRouter.tsx`: test helper that renders the router at a path with the server calls
+  stubbed (`stubServer`), for page tests.
 - `src/App.tsx`: runs the report request as a mutation. Two columns from 960px: the form on the
   left, the result column on the right with an empty, loading, error or report state.
 - `src/api.ts`: the only module that talks to the server. `fetchReport()` (`POST /api/report`)
-  turns 400, 429, 502 and any other failure status into a clear error message;
+  turns 400, 429, 502, 503 and any other failure status into a clear error message;
   `fetchFeatures()` reads `GET /api/features`.
-- `src/features.ts`: `useFeature(name)` is true only when the server lists the flag. Fetched once
-  per page load; while loading or after a failure it is false, so put every flagged piece of UI
-  behind it and it stays hidden until the flag is on.
+- `src/features.ts`: `useFeature(name)` is true only when the server lists the flag for this
+  visitor; `useSignIn()` is true while sign-in exists; `useFeaturesSettled()` once the flags are
+  known. Fetched once per page load; while loading or after a failure the flags are false, so put
+  every flagged piece of UI behind them and it stays hidden until the flag is on.
 - `src/mockReport.ts`: a fixed report used by the tests.
 - `vite.config.ts`: in dev, `/api` is proxied to the Express server on port 3000.
 - `src/packageJson.ts`: parsing and privacy filtering (scope allowlist, non-registry ranges).
@@ -89,7 +117,8 @@ label or icon, never color alone.
 - `src/components/SentPreview.tsx`: the "what is sent" preview, including entries not sent.
 - `src/components/PrivacyNote.tsx`: a "How your data is handled" link under the preview that opens
   the privacy details in a native `<dialog>`. Keep the text in line with the privacy constraints
-  in the root `AGENTS.md` whenever they change. jsdom lacks the dialog methods, so
+  in the root `AGENTS.md` whenever they change. The account sentence shows only while sign-in
+  exists, and reads the flags only while the note is open. jsdom lacks the dialog methods, so
   `src/test-setup.ts` stubs `showModal()` and `close()`.
 - `src/components/ReportView.tsx`: the summary of why the top pick was chosen ("Why <name>")
   above the ranking, since it compares the top two; one card per ranked candidate (the top pick

@@ -32,13 +32,26 @@ export const reportRequestSchema = z.object({
 });
 export type ReportRequest = z.infer<typeof reportRequestSchema>;
 
-// Each flag is turned on by FEATURE_<NAME>=on on the server (see server/src/features.ts).
+// Each flag is turned on by FEATURE_<NAME>=on on the server; accounts can also be a list of
+// GitHub logins (see server/src/features.ts).
 export const features = ['report-links', 'accounts'] as const;
 export type Feature = (typeof features)[number];
 
 /** GET /api/features */
 export interface FeaturesResponse {
+  /** The flags on for this caller. */
   enabled: Feature[];
+  /** Sign-in works (accounts on, or a list of logins): /signin is shown even without a button. */
+  signIn: boolean;
+}
+
+/** GET /api/me: the signed-in user, from GitHub; null when nobody is signed in. */
+export interface Me {
+  id: string;
+  name: string;
+  login: string;
+  image: string | null;
+  email: string;
 }
 
 /** Points at one fetched data field; the server checks it exists for the report. */
