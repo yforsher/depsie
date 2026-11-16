@@ -1,8 +1,12 @@
 import { PGlite } from '@electric-sql/pglite';
 import { drizzle } from 'drizzle-orm/pglite';
 import { migrate } from 'drizzle-orm/pglite/migrator';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { migrationsFolder } from './migrations.js';
+
+// Each test starts PGlite (WebAssembly) and applies every migration: real CPU work that took up to
+// 5.2 s on a busy CI runner, over Vitest's 5 s default.
+vi.setConfig({ testTimeout: 30_000 });
 
 it('builds the events table on an empty database and applies each migration once', async () => {
   const client = new PGlite();
