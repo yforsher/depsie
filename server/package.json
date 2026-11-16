@@ -7,10 +7,13 @@
     "build": "tsc",
     "start": "node --env-file-if-exists=../.env dist/index.js",
     "test": "vitest run",
-    "e2e": "tsx src/e2e.ts"
+    "e2e": "tsx src/e2e.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx --env-file-if-exists=../.env src/db/migrate.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
+    "drizzle-orm": "^0.45.4",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
     "geoip-country": "^5.0.202610240156",
@@ -18,10 +21,12 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
     "@types/express": "^5.0.6",
     "@types/geoip-country": "^5.0.0",
     "@types/node": "^22.20.5",
     "@types/supertest": "^7.2.1",
+    "drizzle-kit": "^0.31.11",
     "supertest": "^7.3.1",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",

@@ -31,3 +31,38 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e
+
+  # Migrations and the server tests on a copy of production, on a Neon branch for this pull
+  # request. The branch is deleted however the job ends (the free plan limits branches).
+  db:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # Two runs of the same pull request would share, and delete, the same branch.
+    concurrency: neon-pr-${{ github.event.number }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - id: branch
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: pr-${{ github.event.number }}
+          parent_branch: production
+      - run: pnpm --filter server db:migrate
+        env:
+          DATABASE_URL: ${{ steps.branch.outputs.db_url }}
+      - run: pnpm --filter server test
+        env:
+          DATABASE_URL: ${{ steps.branch.outputs.db_url }}
+      - if: always() && steps.branch.outcome != 'skipped'
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: pr-${{ github.event.number }}

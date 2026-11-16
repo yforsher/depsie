@@ -10,6 +10,15 @@ Deploy with continuous deployment from GitHub (Cloud Build). Cloud Build builds 
 Cloud Run sets `PORT` (8080). Buildpacks do not work here: the image they built had no server
 packages (`Cannot find package 'express'`) and ran Node 26.
 
+The trigger runs `cloudbuild.yaml`: build, push, migrate, deploy. The migrate step runs
+`server/dist/db/migrate.js` in the image just built, with `DATABASE_URL` from Secret Manager, so
+pending migrations reach the Neon `production` branch before the new revision; a failed
+migration ends the build and the previous revision keeps serving. The trigger was first created
+by Cloud Run with an inline build; to point it at the file, in Cloud Build, Triggers, edit the
+trigger and set Configuration to "Cloud Build configuration file", location `cloudbuild.yaml`.
+The trigger's service account (the default compute account, also used by the Cloud Run service)
+already reads the `DATABASE_URL` secret.
+
 | Setting           | Value                                                                                                                          |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | Source            | This GitHub repo, branch `master`; build type Dockerfile                                                                       |
@@ -21,7 +30,7 @@ packages (`Cannot find package 'express'`) and ran Node 26.
 | Startup CPU boost | On, for shorter cold starts                                                                                                    |
 | CPU and memory    | 1 vCPU, 512 MiB                                                                                                                |
 | Request timeout   | Default 300 seconds, above the 90 second report deadline                                                                       |
-| Secrets           | `OPENROUTER_API_KEY`, `GITHUB_TOKEN`, `DATABASE_URL` (Neon `main` branch), from Secret Manager                                 |
+| Secrets           | `OPENROUTER_API_KEY`, `GITHUB_TOKEN`, `DATABASE_URL` (Neon `production` branch), from Secret Manager                           |
 | Health check      | Startup probe on HTTP `/api/health`                                                                                            |
 | Budget alert      | Monthly alert in Cloud Billing, since pay-as-you-go has no hard cap                                                            |
 
