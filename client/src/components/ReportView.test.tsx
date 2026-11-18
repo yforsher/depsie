@@ -1,5 +1,6 @@
-import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { reportToMarkdown } from '../markdown';
 import { mockReport } from '../mockReport';
 import { ReportView } from './ReportView';
 
@@ -143,5 +144,67 @@ describe('ReportView', () => {
     expect(statuses).toHaveLength(mockReport.security.length * 4);
     statuses.forEach((status) => expect(status.textContent).toMatch(/^(OK|Caution|Risk)$/));
     expect(screen.getByText('Caution')).toBeInTheDocument();
+  });
+});
+
+describe('ReportView freshness', () => {
+  // mockReport was generated on 2026-10-22 at 09:00 UTC.
+  const viewedAfter = (days: number) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(Date.parse(mockReport.generatedAt) + days * 24 * 60 * 60 * 1000));
+  };
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('says the data was fetched today, with no warning, on a new report', () => {
+    viewedAfter(0);
+    render(<ReportView report={mockReport} />);
+    expect(screen.getByText('Data fetched Oct 22, 2026, today.')).toBeInTheDocument();
+    expect(screen.queryByRole('note', { name: 'Old data' })).not.toBeInTheDocument();
+  });
+
+  it('says how many days ago the data was fetched', () => {
+    viewedAfter(3);
+    render(<ReportView report={mockReport} />);
+    expect(screen.getByText('Data fetched Oct 22, 2026, 3 days ago.')).toBeInTheDocument();
+    expect(screen.queryByRole('note', { name: 'Old data' })).not.toBeInTheDocument();
+  });
+
+  it('warns with the given action when the data is 7 days old or more', () => {
+    viewedAfter(10);
+    render(<ReportView report={mockReport} staleAction={<button type="button">Refresh</button>} />);
+    const warning = screen.getByRole('note', { name: 'Old data' });
+    expect(warning).toHaveTextContent(
+      'Releases and vulnerabilities may have changed since the data was fetched.',
+    );
+    expect(within(warning).getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+  });
+});
+
+describe('ReportView Markdown download', () => {
+  it('saves the report as a Markdown file named after its generation date', async () => {
+    // jsdom has no object URLs and does not follow links: record what would be downloaded.
+    let blob: Blob | undefined;
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: (b: Blob) => ((blob = b), 'blob:report'),
+      revokeObjectURL: () => {},
+    });
+    let download: { name: string; href: string } | undefined;
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      download = { name: this.download, href: this.href };
+    });
+
+    render(<ReportView report={mockReport} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Download Markdown' }));
+
+    expect(download).toEqual({ name: 'depsie-2026-10-22.md', href: 'blob:report' });
+    expect(blob!.type).toBe('text/markdown');
+    expect(await blob!.text()).toBe(reportToMarkdown(mockReport));
+    click.mockRestore();
+    vi.unstubAllGlobals();
   });
 });

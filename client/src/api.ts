@@ -4,6 +4,7 @@ import type {
   OwnedReport,
   ReportRequest,
   ReportResponse,
+  ReportSummary,
   SavedReport,
   SharedReport,
 } from 'shared';
@@ -74,9 +75,31 @@ export async function deleteSharedReport(shareId: string): Promise<void> {
   if (!res.ok) throw new Error('The report could not be deleted. It may already be gone.');
 }
 
-// The signed-in owner's report, or null when it is not found (404: missing, expired or not theirs).
-export async function fetchOwnedReport(id: string): Promise<OwnedReport | null> {
-  const res = await fetch(`/api/reports/${id}`);
+// The signed-in user's saved reports, most recently updated first.
+export async function fetchReports(): Promise<ReportSummary[]> {
+  const res = await fetch('/api/reports');
+  if (!res.ok) throw new Error(`Your reports could not be loaded (status ${res.status}).`);
+  return res.json() as Promise<ReportSummary[]>;
+}
+
+// Deletes the owner's report with all its versions.
+export async function deleteReport(id: string): Promise<void> {
+  const res = await fetch(`/api/reports/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('The report could not be deleted. It may already be gone.');
+}
+
+// Runs the report again with its saved inputs; returns the new version. Limits and AI failures
+// read as they do for a new report.
+export async function refreshReport(id: string): Promise<OwnedReport> {
+  const res = await fetch(`/api/reports/${id}/refresh`, { method: 'POST' });
+  if (!res.ok) throw new Error(await errorMessage(res));
+  return res.json() as Promise<OwnedReport>;
+}
+
+// The signed-in owner's report, the given version or else the latest, or null when it is not
+// found (404: missing, expired, not theirs, or no such version).
+export async function fetchOwnedReport(id: string, version?: number): Promise<OwnedReport | null> {
+  const res = await fetch(`/api/reports/${id}${version ? `?version=${version}` : ''}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`The report could not be loaded (status ${res.status}).`);
   return res.json() as Promise<OwnedReport>;

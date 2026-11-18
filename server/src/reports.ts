@@ -1,6 +1,15 @@
 import { randomBytes } from 'node:crypto';
-import { and, desc, eq, gt, isNull, type SQL, sql } from 'drizzle-orm';
-import type { OwnedReport, Report, ReportRequest, SavedReport, SharedReport } from 'shared';
+import { and, count, desc, eq, gt, isNull, max, type SQL, sql } from 'drizzle-orm';
+import type {
+  Framework,
+  OwnedReport,
+  Report,
+  ReportRequest,
+  ReportSummary,
+  ReportVersion,
+  SavedReport,
+  SharedReport,
+} from 'shared';
 import { REPORT_SCHEMA_VERSION } from 'shared';
 import { db } from './db/client.js';
 import { reports, reportVersions } from './db/schema.js';
@@ -49,6 +58,7 @@ export async function findReport(condition: SQL) {
       shareId: reports.share_id,
       expiresAt: reports.expires_at,
       createdAt: reports.created_at,
+      version: reportVersions.version,
       versionCreatedAt: reportVersions.created_at,
       schemaVersion: reportVersions.schema_version,
       report: reportVersions.report,
@@ -61,20 +71,105 @@ export async function findReport(condition: SQL) {
   return row;
 }
 
-// The owner's report, latest version. userId always comes from the session.
+// The owner's report, the given version or else the latest, with its version list. userId always
+// comes from the session.
 export async function findOwnedReport(
   id: string,
   userId: string,
+  version?: number,
 ): Promise<OwnedReport | undefined> {
-  const row = await findReport(and(eq(reports.id, id), eq(reports.user_id, userId))!);
+  const owned = and(eq(reports.id, id), eq(reports.user_id, userId));
+  const row = await findReport(
+    version === undefined ? owned! : and(owned, eq(reportVersions.version, version))!,
+  );
   if (!row) return undefined;
+  const versions = await db()
+    .select({
+      version: reportVersions.version,
+      source: reportVersions.source,
+      createdAt: reportVersions.created_at,
+    })
+    .from(reportVersions)
+    .where(eq(reportVersions.report_id, id))
+    .orderBy(reportVersions.version);
   return {
     id: row.id,
     shareId: row.shareId,
     expiresAt: row.expiresAt.toISOString(),
     owned: true,
+    version: row.version,
+    versions: versions.map((v) => ({
+      version: v.version,
+      source: v.source as ReportVersion['source'],
+      createdAt: v.createdAt.toISOString(),
+    })),
     ...toCurrentSchema(row.schemaVersion, row.report),
   };
+}
+
+// The saved inputs of the owner's unexpired report, to run the pipeline again; undefined for
+// anything else. userId always comes from the session.
+export async function findOwnedInputs(
+  id: string,
+  userId: string,
+): Promise<ReportRequest | undefined> {
+  const [row] = await db()
+    .select({
+      need: reports.need,
+      framework: reports.framework,
+      dependencies: reports.dependencies,
+    })
+    .from(reports)
+    .where(
+      and(eq(reports.id, id), eq(reports.user_id, userId), gt(reports.expires_at, sql`now()`)),
+    );
+  return row && { ...row, framework: row.framework as Framework };
+}
+
+// Appends a refresh version to a signed-in report, numbered after the last one in the same
+// statement, and restarts its retention from that version. Earlier versions are never touched. Two
+// appends at once collide on the (report_id, version) key, and the second fails.
+export async function appendVersion(id: string, userId: string, report: Report): Promise<void> {
+  const [row] = await db()
+    .insert(reportVersions)
+    .values({
+      report_id: id,
+      version: sql`(select max(${reportVersions.version}) + 1 from ${reportVersions} where ${reportVersions.report_id} = ${id})`,
+      schema_version: REPORT_SCHEMA_VERSION,
+      report,
+      source: 'refresh',
+    })
+    .returning({ createdAt: reportVersions.created_at });
+  const createdAt = row!.createdAt;
+  await db()
+    .update(reports)
+    .set({ expires_at: expiresAt({ userId, shareId: null, createdAt, latestVersion: createdAt }) })
+    .where(eq(reports.id, id));
+}
+
+// The user's unexpired reports, most recently updated first. userId always comes from the session.
+export async function listReports(userId: string): Promise<ReportSummary[]> {
+  const updatedAt = max(reportVersions.created_at);
+  const rows = await db()
+    .select({
+      id: reports.id,
+      need: reports.need,
+      framework: reports.framework,
+      shareId: reports.share_id,
+      updatedAt,
+      versionCount: count(),
+    })
+    .from(reports)
+    .innerJoin(reportVersions, eq(reportVersions.report_id, reports.id))
+    .where(and(eq(reports.user_id, userId), gt(reports.expires_at, sql`now()`)))
+    .groupBy(reports.id)
+    .orderBy(desc(updatedAt));
+  return rows.map(({ shareId, updatedAt, framework, ...row }) => ({
+    ...row,
+    framework: framework as Framework,
+    updatedAt: updatedAt!.toISOString(),
+    shared: shareId !== null,
+  }));
 }
 
 export type FoundReport = NonNullable<Awaited<ReturnType<typeof findReport>>>;
@@ -126,6 +221,16 @@ export async function findSharedReport(shareId: string): Promise<SharedReport | 
     deletable: row.userId === null,
     ...toCurrentSchema(row.schemaVersion, row.report),
   };
+}
+
+// Deletes the owner's unexpired report and, by cascade, its versions. userId always comes from the
+// session. Returns whether a report was deleted.
+export async function deleteOwnedReport(id: string, userId: string): Promise<boolean> {
+  const deleted = await db()
+    .delete(reports)
+    .where(and(eq(reports.id, id), eq(reports.user_id, userId), gt(reports.expires_at, sql`now()`)))
+    .returning({ id: reports.id });
+  return deleted.length > 0;
 }
 
 // Deletes an anonymous report and, by cascade, its versions. Signed-in reports cannot be deleted

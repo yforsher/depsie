@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
+import { dataAge } from 'shared';
 import type {
-  CheckStatus,
   Claim,
   EvidenceRef,
   RankedCandidate,
@@ -9,28 +9,20 @@ import type {
   SecurityCheck,
   SecuritySummary,
 } from 'shared';
-
-const statusLabels: Record<CheckStatus, string> = {
-  ok: 'OK',
-  warning: 'Caution',
-  danger: 'Risk',
-};
-
-const factLabels: { key: keyof Omit<SecuritySummary, 'name' | 'version'>; label: string }[] = [
-  { key: 'license', label: 'License' },
-  { key: 'vulnerabilities', label: 'Known vulnerabilities' },
-  { key: 'maintainers', label: 'Maintainers' },
-  { key: 'dependencyCount', label: 'Dependencies' },
-  { key: 'releaseActivity', label: 'Release activity' },
-  { key: 'weeklyDownloads', label: 'Weekly downloads' },
-  { key: 'stars', label: 'Stars' },
-];
+import { reportToMarkdown } from '../markdown';
+import { factLabels, formatDate, statusLabels, uniqueSources } from '../reportFormat';
 
 // The package name already links to npm and the GitHub badge to the repository, so only the
 // sources a card does not otherwise link to get a link of their own.
 const linkedSources = new Set(['OSV', 'deps.dev']);
 
-export function ReportView({ report }: { report: Report }) {
+interface Props {
+  report: Report;
+  /** Shown in the old-data warning: what the viewer can do about it (refresh, sign in, ...). */
+  staleAction?: ReactNode;
+}
+
+export function ReportView({ report, staleAction }: Props) {
   const facts = (name: string) => report.security.find((s) => s.name === name);
 
   return (
@@ -41,6 +33,10 @@ export function ReportView({ report }: { report: Report }) {
           {report.need} ({report.framework}), generated{' '}
           <span className="nowrap">{formatDate(report.generatedAt)}</span>
         </p>
+        <Freshness fetchedAt={report.generatedAt} action={staleAction} />
+        <button type="button" className="link-button" onClick={() => downloadMarkdown(report)}>
+          Download Markdown
+        </button>
       </header>
 
       <section aria-labelledby="ranking-title">
@@ -178,8 +174,7 @@ function ClaimText({ claim }: { claim: Claim }) {
 }
 
 function SourceLabels({ evidence }: { evidence: EvidenceRef[] }) {
-  const bySource = new Map(evidence.map((ref) => [ref.source, ref]));
-  const labels = [...bySource.values()].map((ref, i) => (
+  const labels = uniqueSources(evidence).map((ref, i) => (
     <span key={ref.source}>
       {i > 0 && ', '}
       {linkedSources.has(ref.source) ? (
@@ -276,14 +271,35 @@ function ClaimList({ title, claims }: { title: 'Pros' | 'Cons'; claims: Claim[] 
   );
 }
 
-// "Oct 27, 2026". UTC so a fetch date never shifts a day with the viewer's time zone.
-const dateFormat = new Intl.DateTimeFormat('en-US', {
-  year: 'numeric',
-  month: 'short',
-  day: 'numeric',
-  timeZone: 'UTC',
-});
+// Saves the report shown, built in the browser: nothing is sent to the server.
+function downloadMarkdown(report: Report) {
+  const url = URL.createObjectURL(new Blob([reportToMarkdown(report)], { type: 'text/markdown' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `depsie-${report.generatedAt.slice(0, 10)}.md`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
-export function formatDate(iso: string) {
-  return dateFormat.format(new Date(iso));
+// How old the data is, measured when the report is viewed, since a saved report can be opened
+// long after it was generated.
+function Freshness({ fetchedAt, action }: { fetchedAt: string; action: ReactNode }) {
+  const { days, stale } = dataAge(fetchedAt, new Date());
+  const ago = days === 0 ? 'today' : days === 1 ? '1 day ago' : `${days} days ago`;
+  return (
+    <>
+      <p className="hint">
+        Data fetched {formatDate(fetchedAt)}, {ago}.
+      </p>
+      {stale && (
+        <div className="stale" role="note" aria-label="Old data">
+          <p>
+            <strong className="status-warning">Old data.</strong> Releases and vulnerabilities may
+            have changed since the data was fetched.
+          </p>
+          {action}
+        </div>
+      )}
+    </>
+  );
 }

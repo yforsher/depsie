@@ -2,7 +2,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { SavedReport } from 'shared';
 import { changeShareLink } from '../api';
-import { formatDate } from './ReportView';
+import { formatDate } from '../reportFormat';
 
 // Under a saved report: create its share link, copy it, and for a signed-in owner revoke it and
 // open the saved report. Starts from what the server returned and follows each change it answers.

@@ -45,6 +45,11 @@ export function AccountMenu() {
       {open && (
         <ul className="account-menu-items">
           <li>
+            <Link to="/reports" onClick={() => setOpen(false)}>
+              Reports
+            </Link>
+          </li>
+          <li>
             <Link to="/account" onClick={() => setOpen(false)}>
               Account
             </Link>
