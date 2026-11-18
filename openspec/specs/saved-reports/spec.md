@@ -1,4 +1,12 @@
-## ADDED Requirements
+# saved-reports Specification
+
+## Purpose
+
+Keeps each report so it can be opened again, for only as long as its retention period allows,
+and only by the people allowed to see it: a signed-in report by its owner, everything else through
+its share link.
+
+## Requirements
 
 ### Requirement: Reports are saved with their versions
 

@@ -37,8 +37,8 @@
 
 ## 7. Integration on the live URL
 
-- [ ] 7.1 After merge with both flags off, verify the Migrate step applied both migrations, "Smoke live" passes, `events` keeps its rows without the three columns, and the live report returned `saved: null`; the deploy updated `depsie-cleanup` to the new image, a manual execution succeeds and logs its count, and then the scheduler is resumed
-- [ ] 7.2 With the user's approval, set `FEATURE_REPORT_LINKS=on` and `FEATURE_ACCOUNTS=<the user's login>` and verify on the live URL: an anonymous report link and a signed-in share link open in another browser without signing in; the share page has `noindex` and `no-referrer`; after revoking, the old link returns 404; a cleanup execution deletes an expired test report (no app flow can expire a report early, so make a test report and, with the user's approval, set that one row's `expires_at` in the past on `production`); then set the flags back as the user decides and record the results in `docs/plan-platform.md`
+- [x] 7.1 After merge with both flags off, verify the Migrate step applied both migrations, "Smoke live" passes, `events` keeps its rows without the three columns, and the live report returned `saved: null`; the deploy updated `depsie-cleanup` to the new image, a manual execution succeeds and logs its count, and then the scheduler is resumed
+- [x] 7.2 With the user's approval, set `FEATURE_REPORT_LINKS=on` and `FEATURE_ACCOUNTS=<the user's login>` and verify on the live URL: an anonymous report link and a signed-in share link open in another browser without signing in; the share page has `noindex` and `no-referrer`; after revoking, the old link returns 404; a cleanup execution deletes an expired test report (no app flow can expire a report early, so make a test report and, with the user's approval, set that one row's `expires_at` in the past on `production`); then set the flags back as the user decides and record the results in `docs/plan-platform.md`
 
 ## 8. Code review
 
