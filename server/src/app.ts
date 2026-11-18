@@ -7,7 +7,13 @@ import express, {
 } from 'express';
 import { toNodeHandler } from 'better-auth/node';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
-import { type FeaturesResponse, type Me, type ReportResponse, reportRequestSchema } from 'shared';
+import {
+  type FeaturesResponse,
+  type Me,
+  type ReportRequest,
+  type ReportResponse,
+  reportRequestSchema,
+} from 'shared';
 import * as z from 'zod';
 import { recordVisit, reportAnalytics, setFramework } from './analytics.js';
 import { createAuth } from './auth.js';
@@ -18,11 +24,15 @@ import { log, requestLogging } from './log.js';
 import { AiError } from './openrouter.js';
 import { generateReport } from './report.js';
 import {
+  appendVersion,
   createShareLink,
   deleteByShareLink,
+  deleteOwnedReport,
+  findOwnedInputs,
   findOwnedReport,
   findReportById,
   findSharedReport,
+  listReports,
   revokeShareLink,
   saveReport,
 } from './reports.js';
@@ -61,6 +71,22 @@ export function createApp(clientDir: string) {
     else next('route');
   };
 
+  // One instance for new reports and refreshes, so both count toward the same hourly limit.
+  const reportLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    limit: REPORTS_PER_HOUR,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    // Per signed-in user, so users behind one IP do not share a limit; per IP when anonymous.
+    keyGenerator: (req, res) =>
+      (res.locals.user as User | undefined)?.id ?? ipKeyGenerator(req.ip ?? ''),
+    message: { error: `Too many reports: the limit is ${REPORTS_PER_HOUR} per hour.` },
+    handler: (_req, res, _next, options) => {
+      log('rate limited');
+      res.status(options.statusCode).json(options.message);
+    },
+  });
+
   if (auth) {
     // Before any body parser: Better Auth reads the request stream itself.
     app.all('/api/auth/*splat', toNodeHandler(auth));
@@ -79,16 +105,78 @@ export function createApp(clientDir: string) {
       res.json(me);
     });
 
+    // 401, not 404, without a session: there is no report id to hide.
+    app.get('/api/reports', ...withUser, requireAccounts, async (_req, res) => {
+      const user = res.locals.user as User | undefined;
+      if (!user) {
+        res.status(401).json({ error: 'Sign in to see your reports.' });
+        return;
+      }
+      res.json(await listReports(user.id));
+    });
+
     app.get(
       '/api/reports/:id',
       ...withUser,
       requireAccounts,
       async (req: Request<{ id: string }>, res: Response) => {
         const user = res.locals.user as User | undefined;
-        const report =
-          user && isUuid(req.params.id) ? await findOwnedReport(req.params.id, user.id) : undefined;
+        // No version means the latest; a version that cannot exist is a 404 like any other.
+        const version =
+          req.query.version === undefined ? undefined : versionSchema.safeParse(req.query.version);
+        if (!user || !isUuid(req.params.id) || version?.success === false) return notFound(res);
+        const report = await findOwnedReport(req.params.id, user.id, version?.data);
         if (!report) return notFound(res);
         res.json(report);
+      },
+    );
+
+    app.delete(
+      '/api/reports/:id',
+      ...withUser,
+      requireAccounts,
+      async (req: Request<{ id: string }>, res: Response) => {
+        const user = res.locals.user as User | undefined;
+        const deleted =
+          user && isUuid(req.params.id) && (await deleteOwnedReport(req.params.id, user.id));
+        if (!deleted) return notFound(res);
+        res.status(204).end();
+      },
+    );
+
+    // Session and ownership are checked before the limits, so a stranger never spends anyone's
+    // limit and no AI call is made for them.
+    const ownReportInputs: RequestHandler<{ id: string }> = async (req, res, next) => {
+      const user = res.locals.user as User | undefined;
+      if (!user) {
+        res.status(401).json({ error: 'Sign in to refresh a report.' });
+        return;
+      }
+      const inputs = isUuid(req.params.id)
+        ? await findOwnedInputs(req.params.id, user.id)
+        : undefined;
+      if (!inputs) return notFound(res);
+      res.locals.inputs = inputs;
+      next();
+    };
+
+    // Runs the pipeline again with the saved inputs and appends a refresh version.
+    app.post(
+      '/api/reports/:id/refresh',
+      requestLogging,
+      ...withUser,
+      requireAccounts,
+      ownReportInputs,
+      usageUser,
+      reportLimiter,
+      checkCostCap,
+      async (req: Request<{ id: string }>, res: Response) => {
+        const user = res.locals.user as User;
+        const inputs = res.locals.inputs as ReportRequest;
+        log(`refresh received: framework ${inputs.framework}`);
+        setUsageReport(req.params.id);
+        await appendVersion(req.params.id, user.id, await generateReport(inputs));
+        res.json(await findOwnedReport(req.params.id, user.id));
       },
     );
 
@@ -142,21 +230,6 @@ export function createApp(clientDir: string) {
       res.status(204).end();
     });
   }
-
-  const reportLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000,
-    limit: REPORTS_PER_HOUR,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-    // Per signed-in user, so users behind one IP do not share a limit; per IP when anonymous.
-    keyGenerator: (req, res) =>
-      (res.locals.user as User | undefined)?.id ?? ipKeyGenerator(req.ip ?? ''),
-    message: { error: `Too many reports: the limit is ${REPORTS_PER_HOUR} per hour.` },
-    handler: (_req, res, _next, options) => {
-      log('rate limited');
-      res.status(options.statusCode).json(options.message);
-    },
-  });
 
   app.post(
     '/api/report',
@@ -223,6 +296,9 @@ const npmErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
 
 // Report ids are uuids; anything else cannot exist, and Postgres would reject it as a uuid.
 const isUuid = (id: string) => z.uuid().safeParse(id).success;
+
+// Versions are numbered from 1, in a Postgres integer column: a larger number cannot exist.
+const versionSchema = z.coerce.number().int().positive().max(2_147_483_647);
 
 // The same answer for a missing, expired, unshared or other user's report.
 function notFound(res: Response) {

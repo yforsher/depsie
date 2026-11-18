@@ -128,6 +128,17 @@ export interface Report {
   sources: DataSource[];
 }
 
+/** From this many days after the fetch, a report warns that releases and vulnerabilities may have changed. */
+export const STALE_AFTER_DAYS = 7;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Whole days since the data was fetched, at the time `now`, and whether that is too old. */
+export function dataAge(fetchedAt: string, now: Date): { days: number; stale: boolean } {
+  const days = Math.floor((now.getTime() - Date.parse(fetchedAt)) / DAY_MS);
+  return { days, stale: days >= STALE_AFTER_DAYS };
+}
+
 /** The version of the Report shape above. Bump it on any change, and add a converter on the server. */
 export const REPORT_SCHEMA_VERSION = 1;
 
@@ -148,11 +159,34 @@ export interface ReportResponse {
   saved: SavedReport | null;
 }
 
-/** GET /api/reports/:id: the owner's report, latest version. */
+/** One version of a saved report, in its version list. */
+export interface ReportVersion {
+  version: number;
+  source: 'pipeline' | 'refresh' | 'chat' | 'agent';
+  createdAt: string;
+}
+
+/** GET /api/reports/:id: the owner's report, latest version or the one asked for. */
 export interface OwnedReport extends SavedReport {
   report: Report;
+  /** The version shown. */
+  version: number;
+  /** Every version, oldest first. */
+  versions: ReportVersion[];
   /** Saved with an older schema that could not be converted: shown as saved, read-only. */
   olderFormat: boolean;
+}
+
+/** GET /api/reports: one of the signed-in user's reports, in the list. */
+export interface ReportSummary {
+  id: string;
+  need: string;
+  framework: Framework;
+  /** When its latest version was made (ISO date). */
+  updatedAt: string;
+  versionCount: number;
+  /** It has a share link. */
+  shared: boolean;
 }
 
 /** GET /api/s/:shareId: a shared report, read-only. */

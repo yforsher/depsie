@@ -18,9 +18,23 @@ The server is the only place that holds API keys (`OPENROUTER_API_KEY`, `GITHUB_
   saves the report when a flag applies (see Storage) and returns `{ report, saved }`
   (`ReportResponse` in `shared/`; `saved` is `{ id, expiresAt, shareId, owned }` or `null`). There is
   no endpoint per stage, so clients cannot trigger AI call 2 with their own candidate list.
-- `GET /api/reports/:id` (while `accounts` is not off, for users it is on for): the owner's
-  report, latest version, as `OwnedReport`. Missing, expired, another user's, anonymous or
-  non-uuid ids all get the same 404.
+- `GET /api/reports` (while `accounts` is not off, for users it is on for): the signed-in user's
+  unexpired reports as `ReportSummary[]` (need, framework, latest version time, version count,
+  whether shared), most recently updated first; 401 without a session, since there is no id to
+  hide.
+- `GET /api/reports/:id?version=N` (same flag): the owner's report as `OwnedReport`, version N or
+  the latest without `version`, with `version` (the one shown) and `versions` (number, source,
+  time, oldest first). Missing, expired, another user's, anonymous or non-uuid ids, and a version
+  the report does not have or that is not a positive integer, all get the same 404.
+- `DELETE /api/reports/:id` (same flag): the owner deletes a report and its versions (204), so its
+  share link stops working; 404 for anything else, as above.
+- `POST /api/reports/:id/refresh` (same flag): runs the pipeline again with the report's saved
+  need, framework and dependencies, appends a version with source `refresh` (which restarts the
+  100-day retention) and returns the new version as `OwnedReport`. Checks run in this order:
+  401 without a session, 404 unless it is the caller's unexpired report, then the same hourly
+  limit instance and daily cost cap as `POST /api/report` (429, or 503 without the database), so
+  a stranger spends no one's limit and causes no AI call. Its `ai_usage` rows carry the report
+  id; it writes no `events` row, since per-user numbers come from the account tables.
 - `POST /api/reports/:id/share` (while `accounts` or `report-links` is not off) creates the share
   link, or returns the existing one: for the owner of a signed-in report while `accounts` is on for
   them, or for anyone with the id of an anonymous report while `report-links` is on (the id is only
@@ -207,7 +221,12 @@ failing the request.
   AsyncLocalStorage (`usageUser`), separate from analytics, so `events` never sees a user.
 - `src/reports.ts`: `saveReport()` inserts the report and version 1 (two inserts, no
   transaction: a report without a version reads as missing and expires as usual);
-  `findOwnedReport()` reads the latest version for the session's user; `createShareLink()` (128
+  `findOwnedReport()` reads the latest or a given version for the session's user, with the
+  version list; `listReports()`, `deleteOwnedReport()` and `findOwnedInputs()` (the saved inputs,
+  for a refresh) take the session's user too; `appendVersion()` numbers the new version after the
+  last in one statement (two at once collide on the primary key, and the second fails) and sets
+  `expires_at` from it;
+  `createShareLink()` (128
   random bits, base64url, kept if one exists), `revokeShareLink()`, `findSharedReport()` and
   `deleteByShareLink()` (anonymous reports only). Who may act on a report is decided in
   `reportToShare()` in `app.ts`. Reads go through one

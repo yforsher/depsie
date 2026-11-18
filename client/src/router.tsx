@@ -13,6 +13,7 @@ import { App } from './App.tsx';
 import { useMe } from './account.ts';
 import { AccountMenu } from './components/AccountMenu.tsx';
 import { AccountPage } from './components/AccountPage.tsx';
+import { ReportsPage } from './components/ReportsPage.tsx';
 import { SavedReportPage } from './components/SavedReportPage.tsx';
 import { SharedReportPage } from './components/SharedReportPage.tsx';
 import { SignInPage } from './components/SignInPage.tsx';
@@ -70,17 +71,37 @@ const accountRoute = createRoute({
   },
 });
 
+// The signed-in user's reports. Anyone else is redirected as from /account.
+const reportsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/reports',
+  component: function Reports() {
+    const settled = useFeaturesSettled();
+    const signIn = useSignIn();
+    const me = useMe();
+    if (!settled || me.isLoading) return null;
+    if (me.data) return <ReportsPage />;
+    return <Navigate to={signIn ? '/signin' : '/'} replace />;
+  },
+});
+
 // A signed-in user's saved report. Anyone else is redirected as from /account.
 const savedReportRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/reports/$id',
+  // ?version=N opens an earlier version; without it, the latest.
+  validateSearch: (search: Record<string, unknown>): { version?: number } => {
+    const version = Number(search.version);
+    return Number.isInteger(version) && version > 0 ? { version } : {};
+  },
   component: function SavedReport() {
     const settled = useFeaturesSettled();
     const signIn = useSignIn();
     const me = useMe();
     const { id } = useParams({ from: '/reports/$id' });
+    const { version } = useSearch({ from: '/reports/$id' });
     if (!settled || me.isLoading) return null;
-    if (me.data) return <SavedReportPage id={id} />;
+    if (me.data) return <SavedReportPage id={id} version={version} />;
     return <Navigate to={signIn ? '/signin' : '/'} replace />;
   },
 });
@@ -99,6 +120,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   signInRoute,
   accountRoute,
+  reportsRoute,
   savedReportRoute,
   sharedReportRoute,
 ]);

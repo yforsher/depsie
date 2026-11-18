@@ -1,8 +1,12 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
+import { useMe } from '../account';
 import { deleteSharedReport, fetchSharedReport } from '../api';
+import { useSignIn } from '../features';
+import { formatDate } from '../reportFormat';
 import { OlderFormatNote } from './OlderFormatNote';
-import { formatDate, ReportView } from './ReportView';
+import { ReportView } from './ReportView';
 
 // A report opened by its share link: read-only, for anyone. An anonymous report can be deleted
 // here, after a confirmation.
@@ -23,7 +27,7 @@ export function SharedReportPage({ shareId }: { shareId: string }) {
   return (
     <main>
       {olderFormat && <OlderFormatNote />}
-      <ReportView report={report} />
+      <ReportView report={report} staleAction={<NewReportLinks />} />
       <section className="panel stack share" aria-label="Shared report">
         <p className="hint">
           A shared report, read-only. It is deleted on {formatDate(expiresAt)}.
@@ -54,6 +58,19 @@ export function SharedReportPage({ shareId }: { shareId: string }) {
         )}
       </section>
     </main>
+  );
+}
+
+// A shared report cannot be refreshed: the viewer can sign in to keep their own reports up to
+// date, or run a new one.
+function NewReportLinks() {
+  const signIn = useSignIn();
+  const me = useMe();
+  return (
+    <span className="page-links">
+      {signIn && !me.data && <Link to="/signin">Sign in</Link>}
+      <Link to="/">Run a new report</Link>
+    </span>
   );
 }
 

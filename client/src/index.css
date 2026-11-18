@@ -257,6 +257,60 @@ summary {
   color: var(--text);
 }
 
+/* The reports page: one row per report, its delete control at the right end. */
+.report-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.report-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.report-row > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.report-row .hint {
+  margin: 4px 0 0;
+}
+
+/* A saved report's versions; the one shown is not a link to follow. */
+.version-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.version-list [aria-current='page'] {
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* The old-data warning, with what the viewer can do about it. */
+.stale {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: 8px 0 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--warning);
+}
+
+.stale p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
 /* Pros and cons side by side where a card is wide enough, stacked on phones. */
 .pros-cons {
   display: grid;

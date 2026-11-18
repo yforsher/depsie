@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reportRequestSchema } from './index';
+import { dataAge, reportRequestSchema, STALE_AFTER_DAYS } from './index';
 
 const valid = { need: 'validate forms', framework: 'React' };
 
@@ -60,5 +60,28 @@ describe('reportRequestSchema', () => {
     expect(reportRequestSchema.safeParse({ ...valid, dependencies: longRange }).success).toBe(
       false,
     );
+  });
+});
+
+describe('dataAge', () => {
+  const fetched = '2026-11-01T12:00:00.000Z';
+  const after = (ms: number) => new Date(Date.parse(fetched) + ms);
+  const days = (n: number) => n * 24 * 60 * 60 * 1000;
+
+  it.each([
+    [0, false],
+    [6, false],
+    [7, true],
+    [30, true],
+  ])('at %i days is stale: %s', (n, stale) => {
+    expect(dataAge(fetched, after(days(n)))).toEqual({ days: n, stale });
+  });
+
+  it('counts whole days, so 6 days and 23 hours is 6', () => {
+    expect(dataAge(fetched, after(days(7) - 60 * 60 * 1000))).toEqual({ days: 6, stale: false });
+  });
+
+  it('warns from STALE_AFTER_DAYS', () => {
+    expect(STALE_AFTER_DAYS).toBe(7);
   });
 });

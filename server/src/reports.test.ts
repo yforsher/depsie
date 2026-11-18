@@ -2,13 +2,14 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sql } from 'drizzle-orm';
-import { REPORT_SCHEMA_VERSION } from 'shared';
+import { type Report, REPORT_SCHEMA_VERSION } from 'shared';
 import request from 'supertest';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from './app.js';
 import { deleteExpiredReports } from './cleanup.js';
 import { db, openDatabase } from './db/client.js';
 import { fakeFetch } from './fixtureResponses.js';
+import { appendVersion } from './reports.js';
 import { signedInUser } from './testUsers.js';
 
 const clientDir = mkdtempSync(join(tmpdir(), 'client-dist-'));
@@ -211,8 +212,35 @@ describe('GET /api/reports/:id', () => {
       shareId: null,
       report: { need: 'version 2' },
       olderFormat: false,
+      version: 2,
+      versions: [
+        { version: 1, source: 'pipeline', createdAt: expect.any(String) },
+        { version: 2, source: 'refresh', createdAt: expect.any(String) },
+      ],
     });
     expectDaysAhead(response.body.expiresAt, 100);
+  });
+
+  it('returns an earlier version when asked for it, and 404 for one it does not have', async () => {
+    const alice = await signedInUser('alice');
+    const id = await insertReport({ userId: alice.id, shareId: 'link', expiresInDays: 100 });
+    await db()
+      .execute(sql`insert into report_versions (report_id, version, schema_version, report, source)
+      values (${id}, 2, ${REPORT_SCHEMA_VERSION}, '{"need":"version 2"}', 'refresh')`);
+    const app = appWith({ accounts: 'on' });
+    const get = (query: string) =>
+      request(app).get(`/api/reports/${id}${query}`).set('Cookie', alice.cookie);
+
+    const first = await get('?version=1');
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({ version: 1, report: { need: 'validate forms' } });
+    expect(first.body.versions).toHaveLength(2);
+    // 3000000000 is beyond Postgres integer, the version column's type.
+    for (const query of ['?version=3', '?version=0', '?version=x', '?version=3000000000']) {
+      expect((await get(query)).status).toBe(404);
+    }
+    // The share link always shows the latest.
+    expect((await request(app).get('/api/s/link')).body.report).toEqual({ need: 'version 2' });
   });
 
   it('is 404 for another user, anonymously, and for an anonymous report', async () => {
@@ -265,6 +293,228 @@ describe('GET /api/reports/:id', () => {
       .get(`/api/reports/${id}`)
       .set('Cookie', alice.cookie);
     expect(response.body).toMatchObject({ report: { old: true }, olderFormat: true });
+  });
+});
+
+describe('GET /api/reports', () => {
+  it("lists only the user's unexpired reports, latest version first", async () => {
+    const alice = await signedInUser('alice');
+    const bob = await signedInUser('bob');
+    const older = await insertReport({ userId: alice.id, expiresInDays: 100 });
+    const shared = await insertReport({ userId: alice.id, shareId: 'link', expiresInDays: 100 });
+    // A refresh a minute later makes the older report the most recently updated.
+    await db()
+      .execute(sql`insert into report_versions (report_id, version, schema_version, report, source, created_at)
+      values (${older}, 2, ${REPORT_SCHEMA_VERSION}, '{}', 'refresh', now() + interval '1 minute')`);
+    await insertReport({ userId: alice.id, expiresInDays: -1 });
+    await insertReport({ userId: bob.id });
+    await insertReport({});
+
+    const response = await request(appWith({ accounts: 'on' }))
+      .get('/api/reports')
+      .set('Cookie', alice.cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([
+      {
+        id: older,
+        need: 'validate forms',
+        framework: 'React',
+        updatedAt: expect.any(String),
+        versionCount: 2,
+        shared: false,
+      },
+      {
+        id: shared,
+        need: 'validate forms',
+        framework: 'React',
+        updatedAt: expect.any(String),
+        versionCount: 1,
+        shared: true,
+      },
+    ]);
+    expect(response.body[0].updatedAt > response.body[1].updatedAt).toBe(true);
+  });
+
+  it('is 401 without a session', async () => {
+    expect((await request(appWith({ accounts: 'on' })).get('/api/reports')).status).toBe(401);
+  });
+
+  it('does not exist while accounts is off', async () => {
+    const response = await request(appWith({ reportLinks: 'on' })).get('/api/reports');
+    expect(response.status).toBe(404);
+  });
+});
+
+describe('appendVersion', () => {
+  it('adds a refresh version, keeps the earlier one, and moves retention to 100 days', async () => {
+    const alice = await signedInUser('alice');
+    const id = await insertReport({ userId: alice.id, expiresInDays: 3 });
+    const report = { need: 'refreshed' } as unknown as Report;
+
+    await appendVersion(id, alice.id, report);
+
+    expect(
+      await rows(
+        sql`select version, schema_version, source, report from report_versions order by version`,
+      ),
+    ).toEqual([
+      {
+        version: 1,
+        schema_version: REPORT_SCHEMA_VERSION,
+        source: 'pipeline',
+        report: { need: 'validate forms', ranking: [] },
+      },
+      { version: 2, schema_version: REPORT_SCHEMA_VERSION, source: 'refresh', report },
+    ]);
+    const [{ created_at }] = (await rows(
+      sql`select created_at from report_versions where version = 2`,
+    )) as { created_at: string }[];
+    const { expires_at } = await expiresAtOf(id);
+    expect(expires_at.getTime() - new Date(created_at).getTime()).toBe(100 * DAY_MS);
+  });
+});
+
+describe('POST /api/reports/:id/refresh', () => {
+  // A report saved by the pipeline for alice, with the request body's dependencies.
+  async function aliceReport(app: ReturnType<typeof appWith>) {
+    const alice = await signedInUser('alice');
+    const response = await request(app).post('/api/report').set('Cookie', alice.cookie).send(body);
+    await vi.waitFor(async () => expect(await rows(sql`select id from ai_usage`)).toHaveLength(2));
+    await db().execute(sql`delete from ai_usage`);
+    return { alice, id: response.body.saved.id as string };
+  }
+
+  const outsideCalls = () => vi.mocked(fetch).mock.calls.length;
+  const firstAiCallBody = () =>
+    String(
+      vi.mocked(fetch).mock.calls.find(([url]) => String(url).includes('openrouter'))![1]!.body,
+    );
+
+  it('appends version 2 from the saved inputs, which the share link then shows', async () => {
+    // Earlier tests leave their events, so count this test's own: the new report adds one.
+    const reportEvents = async () =>
+      (await rows(sql`select id from events where kind = 'report'`)).length;
+    const before = (await reportEvents()) + 1;
+    const app = appWith({ accounts: 'on' });
+    const { alice, id } = await aliceReport(app);
+    await vi.waitFor(async () => expect(await reportEvents()).toBe(before));
+    await request(app).post(`/api/reports/${id}/share`).set('Cookie', alice.cookie);
+    vi.mocked(fetch).mockClear();
+
+    const response = await request(app)
+      .post(`/api/reports/${id}/refresh`)
+      .set('Cookie', alice.cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({ id, version: 2, olderFormat: false });
+    expect(response.body.versions.map((v: { source: string }) => v.source)).toEqual([
+      'pipeline',
+      'refresh',
+    ]);
+    expect(firstAiCallBody()).toContain('validate forms');
+    expect(firstAiCallBody()).toContain('react');
+    expect(firstAiCallBody()).toContain('^19.0.0');
+    await vi.waitFor(async () =>
+      expect(await rows(sql`select report_id from ai_usage`)).toEqual([
+        { report_id: id },
+        { report_id: id },
+      ]),
+    );
+    const { shareId } = (await request(app).get(`/api/reports/${id}`).set('Cookie', alice.cookie))
+      .body;
+    const shared = await request(app).get(`/api/s/${shareId}`);
+    expect(shared.body.report.generatedAt).toBe(response.body.report.generatedAt);
+    // Refreshes are counted from the account tables, never in the anonymous analytics.
+    expect(await reportEvents()).toBe(before);
+  });
+
+  it('is 401 without a session, with no outside call', async () => {
+    const app = appWith({ accounts: 'on' });
+    const { id } = await aliceReport(app);
+    vi.mocked(fetch).mockClear();
+
+    expect((await request(app).post(`/api/reports/${id}/refresh`)).status).toBe(401);
+    expect(outsideCalls()).toBe(0);
+  });
+
+  it("is 404 for another user's, an anonymous or an expired report, with no outside call", async () => {
+    const app = appWith({ accounts: 'on' });
+    const { id } = await aliceReport(app);
+    const bob = await signedInUser('bob');
+    const anonymous = await insertReport({});
+    const expired = await insertReport({ userId: bob.id, expiresInDays: -1 });
+    vi.mocked(fetch).mockClear();
+
+    for (const reportId of [id, anonymous, expired, 'not-a-uuid']) {
+      const response = await request(app)
+        .post(`/api/reports/${reportId}/refresh`)
+        .set('Cookie', bob.cookie);
+      expect(response.status).toBe(404);
+    }
+    expect(outsideCalls()).toBe(0);
+  });
+
+  it('shares the hourly limit with new reports, adding no version once it is reached', async () => {
+    const app = appWith({ accounts: 'on' });
+    const { alice, id } = await aliceReport(app);
+    const refresh = () =>
+      request(app).post(`/api/reports/${id}/refresh`).set('Cookie', alice.cookie);
+
+    // The report above was the first of 10 this hour.
+    for (let i = 0; i < 9; i++) expect((await refresh()).status).toBe(200);
+    expect((await refresh()).status).toBe(429);
+    expect(await rows(sql`select version from report_versions`)).toHaveLength(10);
+  });
+
+  it('is refused at the daily cost cap, with no AI call', async () => {
+    const app = appWith({ accounts: 'on' });
+    const { alice, id } = await aliceReport(app);
+    await db()
+      .execute(sql`insert into ai_usage (user_id, source, model, prompt_tokens, completion_tokens, cost, day)
+      values (${alice.id}, 'comparison', 'm', 1, 1, 0.25, (now() at time zone 'utc')::date)`);
+    vi.mocked(fetch).mockClear();
+
+    const response = await request(app)
+      .post(`/api/reports/${id}/refresh`)
+      .set('Cookie', alice.cookie);
+
+    expect(response.status).toBe(429);
+    expect(outsideCalls()).toBe(0);
+  });
+});
+
+describe('DELETE /api/reports/:id', () => {
+  it('deletes the owner’s report with its versions, and its link stops working', async () => {
+    const alice = await signedInUser('alice');
+    const id = await insertReport({ userId: alice.id, shareId: 'link', expiresInDays: 100 });
+    const app = appWith({ accounts: 'on' });
+
+    const response = await request(app).delete(`/api/reports/${id}`).set('Cookie', alice.cookie);
+
+    expect(response.status).toBe(204);
+    expect(await rows(sql`select id from reports`)).toEqual([]);
+    expect(await rows(sql`select report_id from report_versions`)).toEqual([]);
+    expect((await request(app).get('/api/s/link')).status).toBe(404);
+  });
+
+  it('is 404 for another user, an anonymous or expired report, and without a session', async () => {
+    const alice = await signedInUser('alice');
+    const bob = await signedInUser('bob');
+    const alices = await insertReport({ userId: alice.id });
+    const anonymous = await insertReport({});
+    const expired = await insertReport({ userId: bob.id, expiresInDays: -1 });
+    const app = appWith({ accounts: 'on' });
+    const remove = (id: string, cookie?: string) => {
+      const call = request(app).delete(`/api/reports/${id}`);
+      return cookie ? call.set('Cookie', cookie) : call;
+    };
+
+    expect((await remove(alices, bob.cookie)).status).toBe(404);
+    expect((await remove(anonymous, bob.cookie)).status).toBe(404);
+    expect((await remove(expired, bob.cookie)).status).toBe(404);
+    expect((await remove(alices)).status).toBe(404);
+    expect(await rows(sql`select id from reports`)).toHaveLength(3);
   });
 });
 
