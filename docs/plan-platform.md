@@ -28,7 +28,7 @@ Feature flags in this plan:
 
 | Flag           | Hides                                                                                      | Turned on                                                         |
 | -------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| `report-links` | saving anonymous reports and their links, and the matching privacy note                    | after Part 5, when anonymous links work end to end                |
+| `report-links` | saving anonymous reports and their links, and the matching privacy note                    | on since 2026-11-18 (after Part 5)                                |
 | `accounts`     | sign-in, saved reports of signed-in users, their share links, history, refresh, usage page | after Part 6, when a signed-in user has saved reports and history |
 
 ## Part 1: Product requirements
@@ -195,35 +195,35 @@ credit limit.
 
 ## Part 5: Saved reports and links
 
-- [ ] Drop `events.prompt_tokens`, `completion_tokens` and `cost`: no longer written since Part 4
+- [x] Drop `events.prompt_tokens`, `completion_tokens` and `cost`: no longer written since Part 4
       (AI usage lives only in `ai_usage`, so `events` cannot be linked to a user), and no running
       revision writes them by then
-- [ ] Tables `reports` (id, user_id, share_id, need, framework, dependencies, expires_at,
+- [x] Tables `reports` (id, user_id, share_id, need, framework, dependencies, expires_at,
       created_at) and `report_versions` (report_id, version, schema_version, report, source,
       created_at), with tokens and cost in `ai_usage`, which gets a `report_id` column here;
       `source` is `pipeline`, `refresh`, `chat` or `agent`, and every change appends a version
-- [ ] `schema_version` is the version of the shared report schema the report was saved with; on
+- [x] `schema_version` is the version of the shared report schema the report was saved with; on
       read, older versions are converted in code to the current schema, or shown read-only with a
       note when conversion is not possible
-- [ ] `share_id`: random, at least 128 bits, base64url; a report with a `share_id` opens read-only
+- [x] `share_id`: random, at least 128 bits, base64url; a report with a `share_id` opens read-only
       at `/s/:share_id` with no sign-in. Share pages are `noindex` and send
       `Referrer-Policy: no-referrer`, and show the latest version
-- [ ] Retention periods as constants in one module: anonymous without a link 10 days, anonymous
+- [x] Retention periods as constants in one module: anonymous without a link 10 days, anonymous
       with a link 30 days, each counted from the report's `created_at`; signed-in 100 days,
       counted from the latest version, so a refresh or chat version restarts it. `expires_at` is
       set from them when the report is saved, when a version is appended and when an anonymous
       link is created
-- [ ] Signed-in reports: saved to the user, private, `expires_at` 100 days ahead; open at
+- [x] Signed-in reports: saved to the user, private, `expires_at` 100 days ahead; open at
       `/reports/:id` for the owner only. The owner can create a share link (copy button) and
       revoke it, which clears `share_id`; a new link gets a new id
-- [ ] Anonymous reports: saved with no user and `expires_at` 10 days ahead; the result has a
+- [x] Anonymous reports: saved with no user and `expires_at` 10 days ahead; the result has a
       button to create a share link, which sets `share_id` and moves `expires_at` to 30 days after
       `created_at`, then shows the link with a copy button and the deletion date; the link page
       has a delete button
-- [ ] Expired reports return 404 on read, whether or not they are deleted yet
-- [ ] Daily cleanup: a Cloud Run job (`pnpm cleanup`) started by Cloud Scheduler deletes expired
+- [x] Expired reports return 404 on read, whether or not they are deleted yet
+- [x] Daily cleanup: a Cloud Run job (`pnpm cleanup`) started by Cloud Scheduler deletes expired
       reports and their versions; no public endpoint
-- [ ] Update the privacy note: what is stored for anonymous and signed-in use, for how long, who
+- [x] Update the privacy note: what is stored for anonymous and signed-in use, for how long, who
       can open it, and how to delete it or revoke a link; that a session cookie is set only after
       signing in and is needed for it to work (the note says today that there are no cookies)
 
@@ -238,6 +238,23 @@ older schema version still opens.
 Success criteria: an anonymous report link and a signed-in share link open in another browser
 without signing in; after revoking, the old link returns 404; a cleanup run on the live database
 deletes an expired test report.
+
+Done 2026-11-18 (PR #16): the deploy ran Migrate (4 seconds, migrations 0005 and 0006) and
+production kept its `events` rows (111) without the token and cost columns. Dropping them lost the
+old revision's analytics writes for about 64 seconds, between Migrate and the new revision serving
+(accepted: Drizzle names every schema column in an insert, so a two-step drop is not possible). With
+both flags off, "Smoke live" passed (2 tests in 37 seconds) and its report was not saved: no
+`reports` rows, and its two `ai_usage` rows had no report id. The Cloud Run job `depsie-cleanup`
+and its paused Cloud Scheduler trigger were created before the merge (the deploy's last step
+updates the job image); a manual run logged `deleted 0 expired reports`, and the 03:00 UTC
+trigger was resumed. With `report-links` on and `accounts` set to the user's login: an anonymous
+report saved with no user for 10 days; its link (the same id when asked twice) moved retention to
+30 days and opened in a fresh browser without signing in, with `noindex` and `no-referrer` and no
+report id; a signed-in share link opened the same way, read-only with no delete button, and
+returned 404 after the user revoked it. A cleanup run deleted an expired test report and its version
+(its `expires_at` set in the past by hand, with the user's approval); its link returned 404 before
+the run. `report-links` stays on from 2026-11-18; `accounts` was set back to `off`. Follow-up
+PR #17 clarified the share controls text before a link exists.
 
 ## Part 6: History, freshness and export
 

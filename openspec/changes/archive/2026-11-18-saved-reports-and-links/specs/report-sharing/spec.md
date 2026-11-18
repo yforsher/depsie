@@ -1,3 +1,8 @@
+## Purpose
+
+Lets a developer show a report to a teammate or reviewer with an unguessable read-only link, which
+its owner can revoke, or, for an anonymous report, anyone with the link can delete.
+
 ## ADDED Requirements
 
 ### Requirement: Share links are unguessable
