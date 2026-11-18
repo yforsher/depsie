@@ -258,16 +258,16 @@ PR #17 clarified the share controls text before a link exists.
 
 ## Part 6: History, freshness and export
 
-- [ ] Reports page: the user's reports, open in the existing `ReportView`, version list, share
+- [x] Reports page: the user's reports, open in the existing `ReportView`, version list, share
       link state, delete
-- [ ] Freshness: every report shows when its data was fetched and how long ago, compared with the
+- [x] Freshness: every report shows when its data was fetched and how long ago, compared with the
       time it is viewed; after 7 days (one shared constant) a warning says that releases and
       vulnerabilities may have changed since then
-- [ ] Refresh, for the signed-in owner only: runs the pipeline again with the saved need,
+- [x] Refresh, for the signed-in owner only: runs the pipeline again with the saved need,
       framework and dependencies and appends a version with source `refresh`; older versions stay
       viewable. It counts toward the per-user limit and cost cap. On an anonymous or shared report,
       the warning suggests signing in or running a new report
-- [ ] Markdown download built in code from the structured report (the old Part 15), including the
+- [x] Markdown download built in code from the structured report (the old Part 15), including the
       fetch date
 
 Tests: the freshness function at 0, 6, 7 and 30 days; refresh appends a version with the same
@@ -277,6 +277,18 @@ contains every report section and the fetch date.
 Success criteria: the reports page lists the user's reports; a report older than 7 days shows the
 warning, and refreshing it creates version 2 with today's fetch date, which the share link then
 shows; the downloaded Markdown matches the screen.
+
+Done 2026-11-18 (PR #19): the deploy needed no migration. With `accounts` off, "Smoke live" passed
+(2 tests in 52 seconds), and anonymous visitors got the fetch date line and the Markdown download.
+With `FEATURE_ACCOUNTS=yforsher`: the reports page listed the user's reports; a new test report's
+fetch date and version date were set 8 days back by hand (with the user's approval), and it showed
+"8 days ago" and the old-data warning with Refresh. Refresh appended version 2 with source
+`refresh`, today's fetch date and a deletion date 100 days ahead; its share link, opened without a
+session, showed version 2, not deletable and without the report id; version 1 still opened,
+marked earlier, with the warning and no Refresh. The Markdown (`depsie-2026-11-18.md`) had every
+package, fact, pro and con on screen and each source's fetch date. Deleting from the report page
+returned to `/reports` without it, and the report and its link returned 404. The two runs wrote
+four `ai_usage` rows ($0.0043). `accounts` was set back to `off`.
 
 ## Part 7: Observability and usage
 
