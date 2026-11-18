@@ -23,7 +23,7 @@ describe('fakeFetch', () => {
       .send({ need: 'validate forms', framework: 'React' });
 
     expect(response.status).toBe(200);
-    expect(response.body.ranking.map((entry: { name: string }) => entry.name)).toEqual([
+    expect(response.body.report.ranking.map((entry: { name: string }) => entry.name)).toEqual([
       '@hookform/resolvers',
     ]);
   });

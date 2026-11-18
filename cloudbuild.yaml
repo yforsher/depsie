@@ -27,6 +27,12 @@ steps:
       - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
       - --region=$_DEPLOY_REGION
       - --quiet
+  # The daily cleanup job (docs/hosting.md) runs the image just deployed, so its code always matches
+  # the live revision and the migrated schema.
+  - id: Update cleanup job
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args: [run, jobs, update, depsie-cleanup, --image=$_IMAGE, --region=$_DEPLOY_REGION, --quiet]
 
 images: [$_IMAGE]
 

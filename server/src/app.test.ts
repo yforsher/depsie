@@ -26,12 +26,10 @@ vi.mock('./db/client.js', async () => {
   };
 });
 
-// Each recorded event as its values: kind, visitor, country, framework, status, prompt_tokens,
-// completion_tokens, cost.
+// Each recorded event as its values: kind, visitor, country, framework, status.
 async function inserts() {
   const result = await db.client!.query(
-    `select kind, visitor, country, framework, status, prompt_tokens, completion_tokens,
-       cost::float8 as cost from events order by id`,
+    'select kind, visitor, country, framework, status from events order by id',
     [],
     { rowMode: 'array' },
   );
@@ -138,7 +136,9 @@ describe('POST /api/report', () => {
     const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
 
     expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({
+    // Intended change: the report comes with where it was saved; nothing is saved with the flags off.
+    expect(response.body.saved).toBeNull();
+    expect(response.body.report).toMatchObject({
       need: 'validate forms',
       framework: 'React',
       ranking: [{ rank: 1, name: '@hookform/resolvers', version: '6.0.0' }],
@@ -449,7 +449,7 @@ describe('analytics', () => {
 
     const rows = await waitForInserts(1);
     // Supertest connects from localhost, which has no country.
-    expect(rows[0]).toEqual(['report', visitor, null, 'React', 200, null, null, null]);
+    expect(rows[0]).toEqual(['report', visitor, null, 'React', 200]);
   });
 
   it('never records the need text or dependency names', async () => {
@@ -470,7 +470,7 @@ describe('analytics', () => {
     await request(createApp(clientDir)).post('/api/report').send({ need: '', framework: 'React' });
 
     const rows = await waitForInserts(1);
-    expect(rows[0]).toEqual(['report', visitor, null, null, 400, null, null, null]);
+    expect(rows[0]).toEqual(['report', visitor, null, null, 400]);
   });
 
   it('records a visit when the app shell is served, not for assets', async () => {
@@ -479,7 +479,7 @@ describe('analytics', () => {
     await request(app).get('/app.js');
 
     const rows = await waitForInserts(1);
-    expect(rows[0]).toEqual(['visit', visitor, null, null, null, null, null, null]);
+    expect(rows[0]).toEqual(['visit', visitor, null, null, null]);
   });
 
   it('gives the same visitor the same hash within a day', async () => {

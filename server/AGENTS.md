@@ -13,9 +13,24 @@ The server is the only place that holds API keys (`OPENROUTER_API_KEY`, `GITHUB_
 - `/api/auth/*` (Better Auth: GitHub sign-in, sign-out, delete account) and `GET /api/me` (the
   signed-in user, or `null`: not 401, which browsers log as a console error) exist only while
   `accounts` is not off.
-- `POST /api/report` is the only report endpoint. It validates `{ need, framework, dependencies? }`
-  with Zod (with input size limits), then runs the whole pipeline and returns the report. There is
+- `POST /api/report` is the only endpoint that makes a report. It validates
+  `{ need, framework, dependencies? }` with Zod (with input size limits), runs the whole pipeline,
+  saves the report when a flag applies (see Storage) and returns `{ report, saved }`
+  (`ReportResponse` in `shared/`; `saved` is `{ id, expiresAt, shareId, owned }` or `null`). There is
   no endpoint per stage, so clients cannot trigger AI call 2 with their own candidate list.
+- `GET /api/reports/:id` (while `accounts` is not off, for users it is on for): the owner's
+  report, latest version, as `OwnedReport`. Missing, expired, another user's, anonymous or
+  non-uuid ids all get the same 404.
+- `POST /api/reports/:id/share` (while `accounts` or `report-links` is not off) creates the share
+  link, or returns the existing one: for the owner of a signed-in report while `accounts` is on for
+  them, or for anyone with the id of an anonymous report while `report-links` is on (the id is only
+  in the creator's `POST /api/report` response). An anonymous report is then kept 30 days from its
+  creation. `DELETE /api/reports/:id/share` (owner only, `accounts`) revokes it.
+- `GET /api/s/:shareId` (while `accounts` or `report-links` is not off): the shared report, latest
+  version, read-only, for anyone, as `SharedReport` (no report id). `DELETE /api/s/:shareId`
+  (`report-links`) deletes an anonymous report by its link; a signed-in report gets 404. This
+  endpoint and the app shell at `/s/*` send `X-Robots-Tag: noindex` and
+  `Referrer-Policy: no-referrer`, since a link is a secret.
 - `POST /api/report` has an hourly rate limit (per signed-in user, else per IP) and daily AI cost
   caps (per user, and one shared by all anonymous use) to keep costs predictable.
 - In production, Express also serves the built client (`client/dist`) with SPA fallback.
@@ -57,17 +72,25 @@ failing the request.
 ## Storage
 
 - All package data is fetched on every request; nothing is cached.
-- User input and reports are never stored.
+- Reports are saved (`reports` and `report_versions` in `src/db/schema.ts`): a signed-in
+  user's while `accounts` is on for them, an anonymous one while `report-links` is on;
+  otherwise nothing is saved. A report keeps the need, framework and sent dependencies; each
+  version the report, its `schema_version`, its `source` (`pipeline`, `refresh`, `chat`,
+  `agent`) and time, and a change appends a version. Deleting a report or its user deletes its
+  versions (`ON DELETE CASCADE`). Every read ignores reports past `expires_at`.
 - Anonymous analytics go to one `events` table in Neon Postgres (`src/db/schema.ts`). The
   `production` branch is production, the `dev` branch is for local runs. Only the columns in that
   file are written.
-- `ai_usage` (`src/db/schema.ts`): one row per AI call, with the signed-in user or none; the cost
-  caps read only this table. It is separate from `events`, which is never linked to users.
+- `ai_usage` (`src/db/schema.ts`): one row per AI call, with the signed-in user or none and the
+  saved report or none (`report_id`, no foreign key: the row is written before the report row
+  exists); the cost caps read only this table. It is separate from `events`, which is never linked to users.
 - Schema changes: edit `src/db/schema.ts`, run `pnpm db:generate`, and commit the generated
   migration in `drizzle/` with the pull request. Never `drizzle-kit push`, never change the
   `production` branch by hand. Migrations only go forward: no down migrations; a mistake is
   fixed with a new migration, and an applied migration is never edited. They must work with the
-  code still running: add first, remove in a later deploy. The one exception is the first
+  code still running: add first, remove in a later deploy. Drizzle names every schema column in an
+  insert, so dropping a column breaks the running revision's inserts into that table until the new
+  revision serves (Part 5 accepted this for the `events` analytics columns). The one exception is the first
   migration, edited once before it was ever applied to `CREATE TABLE IF NOT EXISTS`, so it
   records the hand-made `events` table on `production` and `dev` without changing it.
 - CI: on each pull request, the `db` job in `.github/workflows/ci.yml` creates the Neon branch
@@ -118,8 +141,7 @@ failing the request.
 - `src/analytics.ts`: records a `visit` when the app shell is served and a `report` row when a
   `POST /api/report` response finishes (any status, including 400 and 429), with the framework,
   and no tokens or cost: those are only in `ai_usage`, where they would otherwise let a
-  signed-in user's calls be matched to this anonymous row (its old token and cost columns are
-  no longer written and are dropped in Part 5). The visitor is
+  signed-in user's calls be matched to this anonymous row. The visitor is
   a SHA-256 hash of the IP with a salt kept in memory and replaced each UTC day; country comes
   from `geoip-country` (bundled GeoLite2 data, no outside call). Writes go through `db()` from
   `src/db/client.ts` (Drizzle on the Neon HTTP driver), are not awaited and only log on failure,
@@ -181,8 +203,24 @@ failing the request.
   usage (so a rejected answer still counts), writes one `ai_usage` row per AI call (source is the
   step name, model, tokens, cost, and the UTC day only, not the time, so a user's calls cannot be
   matched by time to the anonymous `events` rows); not awaited and only logged on failure. The
-  user comes from its own AsyncLocalStorage (`usageUser`), separate from analytics, so `events`
-  never sees a user.
+  user, and the report id once `setUsageReport()` sets it before the pipeline, come from its own
+  AsyncLocalStorage (`usageUser`), separate from analytics, so `events` never sees a user.
+- `src/reports.ts`: `saveReport()` inserts the report and version 1 (two inserts, no
+  transaction: a report without a version reads as missing and expires as usual);
+  `findOwnedReport()` reads the latest version for the session's user; `createShareLink()` (128
+  random bits, base64url, kept if one exists), `revokeShareLink()`, `findSharedReport()` and
+  `deleteByShareLink()` (anonymous reports only). Who may act on a report is decided in
+  `reportToShare()` in `app.ts`. Reads go through one
+  query that joins the latest version and filters `expires_at > now()`.
+- `src/retention.ts`: the retention periods in days (anonymous 10, anonymous with a link 30, both
+  from creation; signed-in 100 from the latest version) and `expiresAt()`, which every write that
+  changes the owner, the link or the versions uses to set `expires_at`.
+- `src/reportSchema.ts`: `toCurrentSchema()` converts a stored version to
+  `REPORT_SCHEMA_VERSION` (`shared/`) through its converters (none yet); without a path it
+  returns the report as stored with `olderFormat: true`. Bump the version and add a converter on
+  any change to the `Report` shape.
+- `src/testUsers.ts`: `signedInUser()` for tests (Better Auth `testUtils`); excluded from the
+  build.
 - `src/fixtures/`: trimmed real responses. `src/fixtureResponses.ts` serves them by URL, builds
   a valid AI call 2 answer, and has `fakeFetch()`, which answers every outside call of a whole
   report (each AI call by the schema name it asks for). `src/fixtures.ts` re-exports it and adds

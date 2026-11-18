@@ -39,14 +39,17 @@ step limit and a cost cap enforced in code.
 
 - The tool must work fully without a file: need + framework is enough for a result.
 - package.json is optional and is parsed and filtered in the browser only. The server receives the need, framework, and filtered public dependency names and declared version ranges; never the raw file, scoped packages outside the allowlist, or non-registry entries. Rules in `client/AGENTS.md`.
-- Reports are stored only as decided in `docs/product.md`, and deleted after a configurable
-  retention period: anonymous reports 10 days, or 30 days once the user creates a share link;
-  signed-in reports 100 days from the latest version, private, with an optional share link the owner can revoke. Deleting
-  an account deletes all its data.
+- Reports are stored only as decided in `docs/product.md` (`reports`: need, framework, sent
+  dependencies, owner, share id, deletion date; `report_versions`: each version of the report),
+  and deleted after a configurable retention period: anonymous reports 10 days, or 30 days once
+  the user creates a share link, both from creation; signed-in reports 100 days from the latest
+  version, private, with an optional share link the owner can revoke. Anyone with an anonymous
+  report's link can open and delete it. Expired reports are never served and are deleted daily.
+  Deleting an account deletes all its data.
   Package data is not cached.
 - Anonymous activity analytics: visits, report count, framework, success or error status,
   time and country. AI tokens and cost are recorded only in `ai_usage` (per AI call, with the day
-  but not the time), so they cannot link a signed-in user to an `events` row. Unique visitors are counted per day with a
+  but not the time, and the saved report's id), so they cannot link a signed-in user to an `events` row. Unique visitors are counted per day with a
   hash of the IP and a random salt that is replaced daily and never stored, so visitors cannot be
   identified or followed across days. No IP addresses stored, and never the need text, dependency
   names or the report. The `events` table is never linked to users or reports; per-user numbers

@@ -1,12 +1,11 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { testUtils } from 'better-auth/plugins';
 import { sql } from 'drizzle-orm';
 import request from 'supertest';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from './app.js';
-import { createAuth } from './auth.js';
+import { signedInUser } from './testUsers.js';
 import { db, openDatabase } from './db/client.js';
 import { fakeFetch } from './fixtureResponses.js';
 
@@ -29,15 +28,6 @@ afterEach(async () => {
   await db().execute(sql`delete from "user"`);
   await db().execute(sql`delete from ai_usage`);
 });
-
-// The same configuration with Better Auth's test helpers, to create users and sessions directly.
-async function signedInUser(login = 'alice') {
-  const { test } = await createAuth([testUtils()]).$context;
-  const user = test.createUser({ name: 'Alice', email: `${login}@example.com` });
-  await test.saveUser({ ...user, githubLogin: login, image: 'https://avatars.example/a.png' });
-  const { headers } = await test.login({ userId: user.id });
-  return { id: user.id, cookie: headers.get('cookie')! };
-}
 
 // GitHub's token endpoint, profile and emails, answered like the real API.
 function stubGitHub(profile = { login: 'alice', name: 'Alice' }) {

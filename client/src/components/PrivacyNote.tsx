@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { useSignIn } from '../features';
+import { useFeature, useSignIn } from '../features';
 
 // A link-styled button that opens the privacy details in a native modal dialog, which handles
 // focus, Esc and the backdrop itself.
@@ -43,7 +43,8 @@ export function PrivacyNote() {
           {open && <StorageLine />}
           <li>
             The tokens and cost of each AI call are stored with its day (not the time) to enforce
-            daily cost limits, with your account when you are signed in.
+            daily cost limits, with your account when you are signed in and with the report when it
+            is stored.
           </li>
           <li>
             Anonymous usage counts are stored: page visits and reports with the time, country,
@@ -73,16 +74,36 @@ export function PrivacyNote() {
 
 // Asks for the flags only while the note is open, so loading the form makes no extra request.
 function StorageLine() {
-  return useSignIn() ? (
-    <li>
-      Nothing you send and no report is stored on our server. Signing in with GitHub stores your
-      GitHub name, login, avatar and email, and sets a session cookie (plus a short-lived one while
-      sign-in is under way); the GitHub access token and your IP address are not kept. Deleting your
-      account deletes all of it. Without an account there are no cookies.
-    </li>
-  ) : (
-    <li>
-      Nothing you send and no report is stored on our server. There are no accounts and no cookies.
-    </li>
+  const reportLinks = useFeature('report-links');
+  const signIn = useSignIn();
+  return (
+    <>
+      <li>
+        {reportLinks ? (
+          <>
+            Each report is stored with what you sent, and deleted 10 days after it was made, or 30
+            days after it was made once you create a share link. Anyone with the link can open the
+            report and delete it. Without a link, it is shown only on this page.
+          </>
+        ) : signIn ? (
+          <>Without an account, no report is stored.</>
+        ) : (
+          <>Nothing you send and no report is stored on our server.</>
+        )}
+      </li>
+      {signIn ? (
+        <li>
+          Signed in, your reports are stored with your account, private, and deleted 100 days after
+          their latest version. You can share one with a link, which anyone can open read-only until
+          you revoke it. Signing in with GitHub stores your GitHub name, login, avatar and email,
+          and sets a session cookie, which sign-in needs to work (plus a short-lived one while
+          sign-in is under way); the GitHub access token and your IP address are not kept. Deleting
+          your account deletes all of it, your reports included. Without an account there are no
+          cookies.
+        </li>
+      ) : (
+        <li>There are no accounts and no cookies.</li>
+      )}
+    </>
   );
 }

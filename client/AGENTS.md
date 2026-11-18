@@ -22,7 +22,10 @@ structured report in code, without an AI call.
 
 ## Server API
 
-A single `POST /api/report` call with `{ need, framework, dependencies? }` (types in `shared/`),
+`POST /api/report` with `{ need, framework, dependencies? }` returns `{ report, saved }` (types in
+`shared/`; `saved` is null when the report was not saved),
+`POST`/`DELETE /api/reports/:id/share` (create or revoke a link), `GET /api/reports/:id` (the
+owner's report), `GET`/`DELETE /api/s/:shareId` (a shared report, delete by link),
 and `GET /api/features` for the flags on for this visitor and `signIn` (sign-in exists, so
 `/signin` is shown even while no sign-in button is).
 Show a clear message for each error: 400 (invalid input), 429 (hourly or daily limit), 502 (AI
@@ -77,7 +80,8 @@ label or icon, never color alone.
   Depsie wordmark (a link home) and the account menu, in the content column;
   `/` is the report app; `/signin` is the sign-in page while sign-in exists, and redirects home
   otherwise; `/account` is the signed-in user's page, and redirects anyone else to `/signin`
-  while sign-in exists, else home. Any unknown path redirects home (the root route's
+  while sign-in exists, else home; `/reports/$id` is the signed-in owner's saved report and
+  redirects the same way; `/s/$shareId` is a shared report for anyone. Any unknown path redirects home (the root route's
   `notFoundComponent`). Redirects replace the history entry, so Back does not return to them.
   Pages that depend on the flags or the user render nothing until both are known, so a
   signed-in user is never sent away by mistake. The server returns the app shell for every non-API path.
@@ -99,9 +103,20 @@ label or icon, never color alone.
   stubbed (`stubServer`), for page tests.
 - `src/App.tsx`: runs the report request as a mutation. Two columns from 960px: the form on the
   left, the result column on the right with an empty, loading, error or report state.
-- `src/api.ts`: the only module that talks to the server. `fetchReport()` (`POST /api/report`)
+- `src/api.ts`: the only module that talks to the server. `fetchReport()` (`POST /api/report`,
+  returns `ReportResponse`)
   turns 400, 429, 502, 503 and any other failure status into a clear error message;
-  `fetchFeatures()` reads `GET /api/features`.
+  `fetchFeatures()` reads `GET /api/features`; `changeShareLink()`, `fetchOwnedReport()` and
+  `fetchSharedReport()` (null on 404), `deleteSharedReport()`.
+- `src/components/ShareControls.tsx`: under a saved report (the result on `/`, with `openLink`, and
+  `/reports/$id`): Create share link, then the link with a copy button and the deletion date; for
+  a signed-in owner (`saved.owned`) also Revoke link, and on `/` a link to the saved report.
+- `src/components/SavedReportPage.tsx`: the owner's report with `ShareControls`; "Report not
+  found" on 404.
+- `src/components/SharedReportPage.tsx`: a shared report, read-only, with its deletion date, and
+  for an anonymous report Delete report (confirmed first); 404 says the link does not exist or has
+  expired.
+- `src/components/OlderFormatNote.tsx`: the note over a report saved in an older format.
 - `src/features.ts`: `useFeature(name)` is true only when the server lists the flag for this
   visitor; `useSignIn()` is true while sign-in exists; `useFeaturesSettled()` once the flags are
   known. Fetched once per page load; while loading or after a failure the flags are false, so put

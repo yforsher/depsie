@@ -123,6 +123,53 @@ describe('privacy note', () => {
     expect(await openNote()).not.toHaveTextContent('Signing in with GitHub');
   });
 
+  it('says no report is stored while both flags are off', async () => {
+    stubServer({ enabled: [], signIn: false }, null);
+    renderAt('/');
+    const note = await openNote();
+
+    expect(note).toHaveTextContent('Nothing you send and no report is stored on our server.');
+    expect(note).toHaveTextContent('There are no accounts and no cookies.');
+  });
+
+  it('says how long anonymous reports are kept and who can open them while report-links is on', async () => {
+    stubServer({ enabled: ['report-links'], signIn: false }, null);
+    renderAt('/');
+
+    await waitFor(async () => {
+      const note = await openNote();
+      expect(note).toHaveTextContent(
+        'Each report is stored with what you sent, and deleted 10 days after it was made, or 30 days after it was made once you create a share link.',
+      );
+      expect(note).toHaveTextContent(
+        'Anyone with the link can open the report and delete it. Without a link, it is shown only on this page.',
+      );
+      expect(note).toHaveTextContent('There are no accounts and no cookies.');
+    });
+  });
+
+  it('says how signed-in reports are kept, and that the session cookie comes only with sign-in', async () => {
+    stubServer({ enabled: ['accounts'], signIn: true }, null);
+    renderAt('/');
+
+    await waitFor(async () => {
+      const note = await openNote();
+      expect(note).toHaveTextContent(
+        'Signed in, your reports are stored with your account, private, and deleted 100 days after their latest version.',
+      );
+      expect(note).toHaveTextContent(
+        'You can share one with a link, which anyone can open read-only until you revoke it.',
+      );
+      expect(note).toHaveTextContent('Without an account, no report is stored.');
+      expect(note).toHaveTextContent(
+        'sets a session cookie, which sign-in needs to work (plus a short-lived one while sign-in is under way)',
+      );
+      expect(note).toHaveTextContent(
+        'Deleting your account deletes all of it, your reports included. Without an account there are no cookies.',
+      );
+    });
+  });
+
   it('says what an account stores while sign-in exists', async () => {
     stubServer({ enabled: [], signIn: true }, null);
     renderAt('/');

@@ -6,12 +6,16 @@ import {
   date,
   index,
   integer,
+  jsonb,
   numeric,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
+  uuid,
 } from 'drizzle-orm/pg-core';
+import type { Dependency } from 'shared';
 
 // Anonymous analytics: one row per visit and per report request. Never the need text,
 // dependency names, the report or the IP address.
@@ -29,11 +33,8 @@ export const events = pgTable(
     // Report requests only.
     framework: text(),
     status: smallint(),
-    // No longer written (Part 4): tokens and cost live only in ai_usage, so events cannot be matched
-    // to a signed-in user's calls. Dropped in a later deploy, once no running revision writes them.
-    prompt_tokens: integer(),
-    completion_tokens: integer(),
-    cost: numeric({ mode: 'number' }),
+    // No tokens or cost: those live only in ai_usage, so events cannot be matched to a signed-in
+    // user's calls.
   },
   // Named as Postgres named the inline check in the hand-made table, so both schemas compare equal.
   (table) => [check('events_kind_check', sql`${table.kind} in ('visit', 'report')`)],
@@ -57,6 +58,9 @@ export const aiUsage = pgTable(
     day: date({ mode: 'string' })
       .notNull()
       .default(sql`(now() at time zone 'utc')::date`),
+    // The saved report the call was made for; empty when the report is not saved. No foreign key:
+    // the row is written during the pipeline, before the report row exists.
+    report_id: uuid(),
   },
   (table) => [
     index('ai_usage_day_idx').on(table.day),
@@ -137,6 +141,50 @@ export const verification = pgTable(
       .notNull(),
   },
   (table) => [index('verification_identifier_idx').on(table.identifier)],
+);
+
+// A saved report: the request it answers and when it is deleted (src/retention.ts). No user for an
+// anonymous report. The content is in report_versions.
+export const reports = pgTable(
+  'reports',
+  {
+    id: uuid().primaryKey(),
+    user_id: text().references(() => user.id, { onDelete: 'cascade' }),
+    // The id in the share link; null until a link is created, and cleared when it is revoked.
+    share_id: text().unique(),
+    need: text().notNull(),
+    framework: text().notNull(),
+    dependencies: jsonb().$type<Dependency[]>().notNull(),
+    expires_at: timestamp({ withTimezone: true }).notNull(),
+    created_at: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('reports_user_id_idx').on(table.user_id),
+    index('reports_expires_at_idx').on(table.expires_at),
+  ],
+);
+
+// Every change to a report appends a version; earlier versions are never edited.
+export const reportVersions = pgTable(
+  'report_versions',
+  {
+    report_id: uuid()
+      .notNull()
+      .references(() => reports.id, { onDelete: 'cascade' }),
+    version: integer().notNull(),
+    // The shared report schema version the report was saved with (REPORT_SCHEMA_VERSION).
+    schema_version: integer().notNull(),
+    report: jsonb().notNull(),
+    source: text().notNull(),
+    created_at: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.report_id, table.version] }),
+    check(
+      'report_versions_source_check',
+      sql`${table.source} in ('pipeline', 'refresh', 'chat', 'agent')`,
+    ),
+  ],
 );
 
 export const userRelations = relations(user, ({ many }) => ({
