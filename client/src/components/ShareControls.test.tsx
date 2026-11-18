@@ -41,7 +41,9 @@ describe('ShareControls', () => {
       { ...anonymous, shareId: 'abc', expiresAt: '2026-12-17T10:00:00.000Z' },
     ]);
     const { user, writeText } = setup(anonymous);
-    expect(screen.getByText(/deleted on Nov 27, 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/deleted on Nov 27, 2026/)).toHaveTextContent(
+      'Not shared: it is shown only on this page until you create a share link. It is deleted on Nov 27, 2026, or 30 days after its creation once it has a link.',
+    );
 
     await user.click(screen.getByRole('button', { name: 'Create share link' }));
 
@@ -74,7 +76,14 @@ describe('ShareControls', () => {
 
     await user.click(screen.getByRole('button', { name: 'Revoke link' }));
     expect(fetchMock).toHaveBeenCalledWith(`/api/reports/${id}/share`, { method: 'DELETE' });
-    await user.click(await screen.findByRole('button', { name: 'Create share link' }));
+    expect(
+      await screen.findByText(
+        /^Private: only you can open this report until you create a share link./,
+      ),
+    ).toHaveTextContent(
+      'Private: only you can open this report until you create a share link. It is deleted on Nov 27, 2026, 100 days after its latest version.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Create share link' }));
 
     expect(await screen.findByRole('textbox', { name: 'Share link' })).toHaveValue(
       `${location.origin}/s/second`,

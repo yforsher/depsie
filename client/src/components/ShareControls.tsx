@@ -59,13 +59,8 @@ export function ShareControls({
           </button>
           <p className="hint">
             {saved.owned
-              ? 'Only you can open this report.'
-              : 'This report is not shared and can only be seen here.'}{' '}
-            It is deleted on {formatDate(saved.expiresAt)}
-            {saved.owned
-              ? ', 100 days after its latest version'
-              : ', or 30 days after its creation with a link'}
-            .
+              ? `Private: only you can open this report until you create a share link. It is deleted on ${formatDate(saved.expiresAt)}, 100 days after its latest version.`
+              : `Not shared: it is shown only on this page until you create a share link. It is deleted on ${formatDate(saved.expiresAt)}, or 30 days after its creation once it has a link.`}
           </p>
         </>
       )}
