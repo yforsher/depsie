@@ -284,6 +284,6 @@ const dateFormat = new Intl.DateTimeFormat('en-US', {
   timeZone: 'UTC',
 });
 
-function formatDate(iso: string) {
+export function formatDate(iso: string) {
   return dateFormat.format(new Date(iso));
 }

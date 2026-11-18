@@ -47,6 +47,35 @@ Uptime: `.github/workflows/uptime.yml` calls `/api/health` every 6 hours, and Gi
 fails. Cloud Monitoring uptime checks are not used: they run at least every 15 minutes, which would
 keep the instance up and billed all month.
 
+## Report cleanup job
+
+Expired reports are deleted by the Cloud Run job `depsie-cleanup`, not by an endpoint: it runs
+`node /app/server/dist/cleanup.js` in the service image with `DATABASE_URL` from Secret Manager,
+deletes every report past `expires_at` (versions go with it) and logs the count. Cloud Scheduler
+starts it daily. Both run as the default compute account, which already has `roles/run.admin` and
+reads the secret. The last `cloudbuild.yaml` step points the job at each new image, so the job must
+exist before the first deploy that has that step.
+
+Created once (region `europe-west1`, 2026-11-17, with the scheduler paused until the first deploy
+that has `cleanup.js`). Run these from PowerShell: Git Bash rewrites `/app/...` into a Windows
+path before gcloud sees it.
+
+```sh
+gcloud services enable cloudscheduler.googleapis.com
+gcloud run jobs create depsie-cleanup --region=europe-west1 --image=<the current service image> \
+  --command=node --args=/app/server/dist/cleanup.js \
+  --set-secrets=DATABASE_URL=DATABASE_URL:latest --max-retries=0 --task-timeout=5m
+gcloud scheduler jobs create http depsie-cleanup-daily --location=europe-west1 \
+  --schedule="0 3 * * *" --time-zone=UTC \
+  --uri="https://run.googleapis.com/v2/projects/<project id>/locations/europe-west1/jobs/depsie-cleanup:run" \
+  --http-method=POST \
+  --oauth-service-account-email=<project number>-compute@developer.gserviceaccount.com
+```
+
+To run it by hand: `gcloud run jobs execute depsie-cleanup --region=europe-west1 --wait`; the
+count is in the execution's logs. A missed day only keeps expired reports in the table a day
+longer: every read already ignores them.
+
 ## Sign-in (GitHub OAuth)
 
 Sign-in exists while `FEATURE_ACCOUNTS` is `on` or a list of GitHub logins; with it unset, none of

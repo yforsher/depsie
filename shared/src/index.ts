@@ -127,3 +127,39 @@ export interface Report {
   security: SecuritySummary[];
   sources: DataSource[];
 }
+
+/** The version of the Report shape above. Bump it on any change, and add a converter on the server. */
+export const REPORT_SCHEMA_VERSION = 1;
+
+/** A saved report as its creator or owner sees it. */
+export interface SavedReport {
+  id: string;
+  /** When the report is deleted (ISO date). */
+  expiresAt: string;
+  /** The id in the share link, or null while there is none. */
+  shareId: string | null;
+  /** A signed-in user's report: private, at /reports/:id, its link can be revoked. */
+  owned: boolean;
+}
+
+/** POST /api/report: the report, and where it was saved; saved is null when nothing was saved. */
+export interface ReportResponse {
+  report: Report;
+  saved: SavedReport | null;
+}
+
+/** GET /api/reports/:id: the owner's report, latest version. */
+export interface OwnedReport extends SavedReport {
+  report: Report;
+  /** Saved with an older schema that could not be converted: shown as saved, read-only. */
+  olderFormat: boolean;
+}
+
+/** GET /api/s/:shareId: a shared report, read-only. */
+export interface SharedReport {
+  report: Report;
+  expiresAt: string;
+  /** Anonymous reports can be deleted from their link; signed-in ones cannot. */
+  deletable: boolean;
+  olderFormat: boolean;
+}

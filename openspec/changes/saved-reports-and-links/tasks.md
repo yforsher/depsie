@@ -1,0 +1,49 @@
+# Tasks
+
+## 1. Schema
+
+- [x] 1.1 Load superpowers:test-driven-development with the Skill tool. Test first in `migrations.test.ts`: on a fresh database `events` has no `prompt_tokens`, `completion_tokens` or `cost`, and `reports`, `report_versions` and `ai_usage.report_id` exist with the columns, keys, cascades and `source` check from design.md. Remove the three columns from `events` in `server/src/db/schema.ts`, add the new tables and column, and generate the migrations (the drop in its own migration). Load superpowers:verification-before-completion with the Skill tool and run its check: the test passes, `db:generate` reports no changes afterwards, and `db:migrate` on the Neon `dev` branch succeeds and keeps the `events` rows
+- [x] 1.2 Load superpowers:test-driven-development with the Skill tool. Test first: deleting a user removes their reports and versions; deleting a report removes its versions. Load superpowers:verification-before-completion with the Skill tool and run its check: the tests pass
+
+## 2. Retention and schema versions
+
+- [x] 2.1 Load superpowers:test-driven-development with the Skill tool. Test first in `retention.test.ts`: anonymous 10 days after creation, anonymous with a share id 30 days after creation (not after now), signed-in 100 days after the latest version. Then add `server/src/retention.ts` with the three constants and `expiresAt()`. Load superpowers:verification-before-completion with the Skill tool and run its check: the tests pass
+- [x] 2.2 Load superpowers:test-driven-development with the Skill tool. Test first: a version saved with `REPORT_SCHEMA_VERSION` is returned unchanged; a version `0` is returned as stored with `olderFormat: true`. Add `REPORT_SCHEMA_VERSION` and the `SavedReport`, `ReportResponse` and `SharedReport` types to `shared/`, and `server/src/reportSchema.ts`. Load superpowers:verification-before-completion with the Skill tool and run its check: the tests pass and `pnpm build` passes
+
+## 3. Saving reports
+
+- [x] 3.1 Load superpowers:test-driven-development with the Skill tool. Test first in `app.test.ts`: with `report-links` on, an anonymous report is saved with no user, version 1, source `pipeline`, schema version 1, `expires_at` 10 days ahead, and the response is `{ report, saved: { id, expiresAt, shareId: null } }`; with both flags off nothing is saved and `saved` is `null`; a signed-in user with `accounts` on gets a report saved to them 100 days ahead; both `ai_usage` rows carry the saved id, and none when not saved. Change the existing report response expectations to `{ report, saved }` (intended: the response now carries the saved report; the commit says why). Then add `server/src/reports.ts` (save), the report id in the usage AsyncLocalStorage, and save in `POST /api/report`. Load superpowers:verification-before-completion with the Skill tool and run its check: the tests pass and the `events` row of a report is unchanged
+- [x] 3.2 Load superpowers:test-driven-development with the Skill tool. Test first: `GET /api/reports/:id` returns the latest version to the owner; 404 for another user, for an anonymous visitor, for an anonymous report, after `expires_at`, and while `accounts` is off; a version `0` report opens with `olderFormat: true`. Load superpowers:verification-before-completion with the Skill tool and run its check: the tests pass
+- [x] 3.3 Load superpowers:test-driven-development with the Skill tool. Test first in `client/src/api.test.ts` and `App.test.tsx`: `fetchReport()` returns `{ report, saved }` and the report renders as before. Update `api.ts` and `App.tsx`. Load superpowers:verification-before-completion with the Skill tool and run its check: `pnpm --filter client test` and `pnpm e2e` pass
+- [x] 3.4 Document the tables, `reports.ts`, `retention.ts`, `reportSchema.ts`, the new response and `GET /api/reports/:id` in `server/AGENTS.md` (replacing "User input and reports are never stored") and `client/AGENTS.md`; verify each new file is named in its code structure section
+
+## 4. Share links
+
+- [x] 4.1 Load superpowers:test-driven-development with the Skill tool. Test first: `POST /api/reports/:id/share` on an anonymous report sets a 22-character base64url `share_id`, moves `expires_at` to 30 days after creation, and returns the same link when called again; it is 404 while `report-links` is off. For a signed-in report it works for the owner only (404 for another user and anonymously) and `DELETE /api/reports/:id/share` clears the id; a new link gets a different id. Load superpowers:verification-before-completion with the Skill tool and run its check: the tests pass
+- [x] 4.2 Load superpowers:test-driven-development with the Skill tool. Test first: `GET /api/s/:shareId` returns the latest version with `expiresAt`, `deletable` and `olderFormat`, and `X-Robots-Tag: noindex` and `Referrer-Policy: no-referrer`; the app shell at `/s/x` has both headers; 404 for an unknown, revoked or expired share id and for a signed-in report before it is shared; `DELETE /api/s/:shareId` removes an anonymous report and its versions, then the link is 404; it is 404 for a signed-in report, which stays. Load superpowers:verification-before-completion with the Skill tool and run its check: the tests pass
+- [x] 4.3 Load superpowers:test-driven-development with the Skill tool. Test first: with `report-links` on, an anonymous result shows "Create share link", then the link, a copy button and the deletion date; with the flag off no button; a signed-in result also shows "Revoke link" and a link to `/reports/:id`, and a new link after revoking. Add `ShareControls` and its `api.ts` calls. Load superpowers:verification-before-completion with the Skill tool and run its check: the tests pass
+- [x] 4.4 Load superpowers:test-driven-development with the Skill tool. Test first with `testRouter`: `/s/:shareId` shows the report read-only and its deletion date; the delete button (anonymous only) asks for confirmation, deletes and then shows the link is gone; a 404 shows "This link does not exist or has expired"; `/reports/:id` shows the owner's report with `ShareControls`, redirects anyone not signed in as `/account` does, and shows "Report not found" on 404; an older-format report shows its note. Load superpowers:verification-before-completion with the Skill tool and run its check: the tests pass and `pnpm e2e` passes
+- [x] 4.5 Document the share endpoints, headers and who may call them in `server/AGENTS.md`, and the routes and `ShareControls` in `client/AGENTS.md`; verify the endpoint list matches design.md's table
+
+## 5. Privacy note
+
+- [x] 5.1 Load superpowers:test-driven-development with the Skill tool. Test first: with both flags off the note says no report is stored, as today; with `report-links` on it says anonymous reports are kept 10 days, or 30 with a link, that anyone with the link can open and delete it, and that there are no cookies without signing in; while sign-in exists it says signed-in reports are private for 100 days after the latest version, can be shared and revoked, are deleted with the account, and that the session cookie is set only after signing in and is needed for it. Update `PrivacyNote.tsx`. Load superpowers:verification-before-completion with the Skill tool and run its check: the tests pass and the text matches the privacy constraints in the root `AGENTS.md`
+- [x] 5.2 Update the privacy constraints in the root `AGENTS.md` if any wording no longer matches the stored data; verify it names both tables' retention and no other stored report data
+
+## 6. Cleanup job
+
+- [x] 6.1 Load superpowers:test-driven-development with the Skill tool. Test first in `cleanup.test.ts`: with one expired and one current report, the cleanup deletes the expired report and its versions and leaves the other. Add `server/src/cleanup.ts` and the `pnpm cleanup` script. Load superpowers:verification-before-completion with the Skill tool and run its check: the test passes, `pnpm cleanup` runs against the Neon `dev` branch, and no route reaches it
+- [x] 6.2 Add a step to `cloudbuild.yaml` after Deploy that updates the `depsie-cleanup` job to the new image, and document the job and its Scheduler trigger in `docs/hosting.md`; ask the user to approve creating the job (`node /app/server/dist/cleanup.js`, `DATABASE_URL` from Secret Manager) and a daily Cloud Scheduler trigger, then create them (the user chose to keep the scheduler paused until the deploy, since the live image has no `cleanup.js` yet); verify the job has the right command, args and secret, and the scheduler targets it
+
+## 7. Integration on the live URL
+
+- [ ] 7.1 After merge with both flags off, verify the Migrate step applied both migrations, "Smoke live" passes, `events` keeps its rows without the three columns, and the live report returned `saved: null`; the deploy updated `depsie-cleanup` to the new image, a manual execution succeeds and logs its count, and then the scheduler is resumed
+- [ ] 7.2 With the user's approval, set `FEATURE_REPORT_LINKS=on` and `FEATURE_ACCOUNTS=<the user's login>` and verify on the live URL: an anonymous report link and a signed-in share link open in another browser without signing in; the share page has `noindex` and `no-referrer`; after revoking, the old link returns 404; a cleanup execution deletes an expired test report (no app flow can expire a report early, so make a test report and, with the user's approval, set that one row's `expires_at` in the past on `production`); then set the flags back as the user decides and record the results in `docs/plan-platform.md`
+
+## 8. Code review
+
+- [x] 8.1 Load superpowers:requesting-code-review with the Skill tool, then reproduce and fix every Critical and Important finding
+
+## Workflow follow-up
+
+- Archive the change with `openspec-archive-change`, then check off Part 5's substeps in `docs/plan-platform.md` and record its measurements there.

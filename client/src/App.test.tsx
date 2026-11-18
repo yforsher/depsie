@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 import { mockReport } from './mockReport';
 
+// Intended change: POST /api/report returns the report with where it was saved (null: not saved).
+const reportResponse = { report: mockReport, saved: null };
+
 type User = ReturnType<typeof userEvent.setup>;
 
 function mockFetch(response: () => Response | Promise<Response>) {
@@ -42,7 +45,7 @@ afterEach(() => {
 
 describe('App', () => {
   it('goes from form submit to a rendered report from POST /api/report', async () => {
-    const fetchMock = mockFetch(() => Response.json(mockReport));
+    const fetchMock = mockFetch(() => Response.json(reportResponse));
     const user = setup();
     await fillAndSubmit(user);
 
@@ -54,8 +57,31 @@ describe('App', () => {
     expect(sentBody(fetchMock)).toEqual({ need: 'A date picker', framework: 'React' });
   });
 
+  it('offers a share link under a saved report', async () => {
+    const saved = {
+      id: '00000000-0000-4000-8000-000000000001',
+      expiresAt: '2026-11-27T10:00:00.000Z',
+      shareId: null,
+      owned: false,
+    };
+    mockFetch(() => Response.json({ report: mockReport, saved }));
+    const user = setup();
+    await fillAndSubmit(user);
+
+    expect(await screen.findByRole('button', { name: 'Create share link' })).toBeInTheDocument();
+  });
+
+  it('offers no share link when the report was not saved', async () => {
+    mockFetch(() => Response.json(reportResponse));
+    const user = setup();
+    await fillAndSubmit(user);
+
+    await screen.findByRole('heading', { name: 'Recommendation' });
+    expect(screen.queryByRole('region', { name: 'Share' })).not.toBeInTheDocument();
+  });
+
   it('submits with Enter in the need field, while Shift+Enter adds a line', async () => {
-    const fetchMock = mockFetch(() => Response.json(mockReport));
+    const fetchMock = mockFetch(() => Response.json(reportResponse));
     const user = setup();
     await user.selectOptions(screen.getByLabelText('Framework'), 'React');
     await user.type(
@@ -70,7 +96,7 @@ describe('App', () => {
   });
 
   it('does not submit with Enter before the form is filled', async () => {
-    const fetchMock = mockFetch(() => Response.json(mockReport));
+    const fetchMock = mockFetch(() => Response.json(reportResponse));
     const user = setup();
     await user.type(screen.getByLabelText('What do you need?'), 'A date picker{Enter}');
 
@@ -101,7 +127,7 @@ describe('App', () => {
   });
 
   it('sends only the filtered dependencies shown in the preview, never the manifest', async () => {
-    const fetchMock = mockFetch(() => Response.json(mockReport));
+    const fetchMock = mockFetch(() => Response.json(reportResponse));
     const user = setup();
     const manifest = JSON.stringify({
       name: 'internal-app',
@@ -130,7 +156,7 @@ describe('App', () => {
     expect(screen.getByRole('status')).toHaveTextContent('This can take a minute.');
     expect(screen.getByRole('button', { name: 'Generating report...' })).toBeDisabled();
 
-    resolve(Response.json(mockReport));
+    resolve(Response.json(reportResponse));
     await screen.findByRole('heading', { name: 'Recommendation' });
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });

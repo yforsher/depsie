@@ -1,8 +1,9 @@
 import { useMutation } from '@tanstack/react-query';
-import type { Report } from 'shared';
+import type { ReportResponse } from 'shared';
 import { fetchReport } from './api';
 import { RequestForm } from './components/RequestForm';
 import { ReportView } from './components/ReportView';
+import { ShareControls } from './components/ShareControls';
 
 export function App() {
   const report = useMutation({ mutationFn: fetchReport });
@@ -25,7 +26,7 @@ export function App() {
 interface ResultProps {
   isPending: boolean;
   error: Error | null;
-  data: Report | undefined;
+  data: ReportResponse | undefined;
 }
 
 function Result({ isPending, error, data }: ResultProps) {
@@ -44,7 +45,14 @@ function Result({ isPending, error, data }: ResultProps) {
       </p>
     );
   }
-  if (data) return <ReportView report={data} />;
+  if (data) {
+    return (
+      <>
+        <ReportView report={data.report} />
+        {data.saved && <ShareControls key={data.saved.id} saved={data.saved} openLink />}
+      </>
+    );
+  }
   return (
     <p className="placeholder">
       Your recommendation appears here. Describe what you need, pick a framework, and select Get

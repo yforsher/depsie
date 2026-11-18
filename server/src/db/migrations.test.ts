@@ -27,12 +27,9 @@ it('builds the events table on an empty database and applies each migration once
     'country',
     'framework',
     'status',
-    'prompt_tokens',
-    'completion_tokens',
-    'cost',
   ]);
   const applied = await client.query('select * from drizzle.__drizzle_migrations');
-  expect(applied.rows).toHaveLength(5);
+  expect(applied.rows).toHaveLength(7);
 });
 
 it('builds the ai_usage table, one row per AI call', async () => {
@@ -52,6 +49,7 @@ it('builds the ai_usage table, one row per AI call', async () => {
     'completion_tokens',
     'cost',
     'day',
+    'report_id',
   ]);
 });
 
@@ -87,6 +85,8 @@ it('builds the account tables, and deleting a user deletes their AI usage', asyn
     'account',
     'ai_usage',
     'events',
+    'report_versions',
+    'reports',
     'session',
     'user',
     'verification',
@@ -99,4 +99,82 @@ it('builds the account tables, and deleting a user deletes their AI usage', asyn
   `);
   const left = await client.query('select user_id from ai_usage');
   expect(left.rows).toEqual([{ user_id: null }]);
+});
+
+async function columnsOf(client: PGlite, table: string) {
+  const result = await client.query(
+    `select column_name, data_type, is_nullable from information_schema.columns
+     where table_name = $1 order by ordinal_position`,
+    [table],
+  );
+  return result.rows;
+}
+
+it('builds the reports and report_versions tables', async () => {
+  const client = new PGlite();
+  await migrate(drizzle({ client }), { migrationsFolder });
+
+  expect(await columnsOf(client, 'reports')).toEqual([
+    { column_name: 'id', data_type: 'uuid', is_nullable: 'NO' },
+    { column_name: 'user_id', data_type: 'text', is_nullable: 'YES' },
+    { column_name: 'share_id', data_type: 'text', is_nullable: 'YES' },
+    { column_name: 'need', data_type: 'text', is_nullable: 'NO' },
+    { column_name: 'framework', data_type: 'text', is_nullable: 'NO' },
+    { column_name: 'dependencies', data_type: 'jsonb', is_nullable: 'NO' },
+    { column_name: 'expires_at', data_type: 'timestamp with time zone', is_nullable: 'NO' },
+    { column_name: 'created_at', data_type: 'timestamp with time zone', is_nullable: 'NO' },
+  ]);
+  expect(await columnsOf(client, 'report_versions')).toEqual([
+    { column_name: 'report_id', data_type: 'uuid', is_nullable: 'NO' },
+    { column_name: 'version', data_type: 'integer', is_nullable: 'NO' },
+    { column_name: 'schema_version', data_type: 'integer', is_nullable: 'NO' },
+    { column_name: 'report', data_type: 'jsonb', is_nullable: 'NO' },
+    { column_name: 'source', data_type: 'text', is_nullable: 'NO' },
+    { column_name: 'created_at', data_type: 'timestamp with time zone', is_nullable: 'NO' },
+  ]);
+  // A plain uuid, not a foreign key: usage rows are written before the report row exists.
+  expect((await columnsOf(client, 'ai_usage')).at(-1)).toEqual({
+    column_name: 'report_id',
+    data_type: 'uuid',
+    is_nullable: 'YES',
+  });
+});
+
+it('keeps share ids unique, one version number per report, and only the known sources', async () => {
+  const client = new PGlite();
+  await migrate(drizzle({ client }), { migrationsFolder });
+  const report = (id: string, shareId: string) =>
+    client.exec(`insert into reports (id, share_id, need, framework, dependencies, expires_at)
+      values ('${id}', '${shareId}', 'n', 'React', '[]', now() + interval '1 day')`);
+  const version = (version: number, source: string) =>
+    client.exec(`insert into report_versions (report_id, version, schema_version, report, source)
+      values ('00000000-0000-4000-8000-000000000001', ${version}, 1, '{}', '${source}')`);
+
+  await report('00000000-0000-4000-8000-000000000001', 's1');
+  await expect(report('00000000-0000-4000-8000-000000000002', 's1')).rejects.toThrow();
+  await version(1, 'pipeline');
+  await expect(version(1, 'refresh')).rejects.toThrow();
+  await expect(version(2, 'other')).rejects.toThrow();
+});
+
+it('deletes a report with its versions, and a user with their reports', async () => {
+  const client = new PGlite();
+  await migrate(drizzle({ client }), { migrationsFolder });
+  await client.exec(`
+    insert into "user" (id, name, email, updated_at) values ('u1', 'A', 'a@example.com', now());
+    insert into reports (id, user_id, need, framework, dependencies, expires_at) values
+      ('00000000-0000-4000-8000-000000000001', 'u1', 'n', 'React', '[]', now() + interval '1 day'),
+      ('00000000-0000-4000-8000-000000000002', null, 'n', 'React', '[]', now() + interval '1 day'),
+      ('00000000-0000-4000-8000-000000000003', null, 'n', 'React', '[]', now() + interval '1 day');
+    insert into report_versions (report_id, version, schema_version, report, source)
+      select id, 1, 1, '{}', 'pipeline' from reports;
+    delete from "user" where id = 'u1';
+    delete from reports where id = '00000000-0000-4000-8000-000000000002';
+  `);
+
+  const left = await client.query('select report_id from report_versions');
+  expect(left.rows).toEqual([{ report_id: '00000000-0000-4000-8000-000000000003' }]);
+  expect((await client.query('select id from reports')).rows).toEqual([
+    { id: '00000000-0000-4000-8000-000000000003' },
+  ]);
 });

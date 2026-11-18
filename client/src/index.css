@@ -741,3 +741,18 @@ summary {
 .error-text {
   color: var(--danger);
 }
+
+/* Under a saved report: its share link with a copy button beside it. */
+.share {
+  margin-top: 24px;
+}
+
+.share-link {
+  display: flex;
+  gap: 8px;
+}
+
+.share-link input {
+  flex: 1;
+  min-width: 0;
+}

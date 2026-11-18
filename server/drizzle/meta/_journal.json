@@ -36,6 +36,20 @@
       "when": 1794845205646,
       "tag": "0004_ai_usage_day",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794923513707,
+      "tag": "0005_reports",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794923521936,
+      "tag": "0006_events_drop_ai_columns",
+      "breakpoints": true
     }
   ]
 }
