@@ -115,9 +115,19 @@ time.
 - Do not use `superpowers:brainstorming`, `writing-plans`, `executing-plans` or
   `subagent-driven-development`; the plan files and OpenSpec replace them.
 - No regressions: existing functionality keeps working after every part. All existing tests and
-  the smoke test (`pnpm e2e`) pass in CI, and the "Smoke live" workflow passes against the live
-  URL after each deploy and before turning a flag on. A test changes only when the behavior
-  change is intended, and the commit says why.
+  the smoke test (`pnpm e2e`) pass in CI and, at each deploy, against the new revision. A test
+  changes only when the behavior change is intended, and the commit says why.
+- Release order: develop on a branch, commit, open a pull request, CI passes (`pnpm ship` does
+  these), merge (the user's decision). The deploy then migrates production, deploys the new revision with no traffic, runs
+  the smoke test against it and promotes it only if it passes (`docs/hosting.md`, Releases). A
+  failed smoke test is fixed with a revert or a fix pull request. Turning a flag on goes through
+  the same gate by hand, with the "Smoke live" workflow against the candidate URL.
+- `pnpm ship` takes changes to an open pull request with its CI results, and `pnpm release`
+  merges it and reports the deploy and its smoke test. An AI agent uses these two commands instead
+  of calling `git push`, `gh pr create`, `gh pr checks` or `gh pr merge` directly, and runs `ship`
+  only when the user asks to commit and push (piping its confirmation: `echo y | pnpm ship -m
+...`), and `release` only when the user decides to merge.
+  `gh` stays fine for reading (a pull request, its comments or a run's log).
 - Feature flags: a new feature stays hidden behind a flag (`FEATURE_<NAME>`, off in production)
   until it gives the user value on its own. Turning a flag on is the user's decision, recorded in
   the plan file with the date; the flag is removed in a later small change once the feature is

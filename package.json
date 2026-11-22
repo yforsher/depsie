@@ -14,7 +14,9 @@
     "build": "pnpm -r build",
     "start": "node server/dist/index.js",
     "dev": "pnpm -r --parallel dev",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "ship": "node scripts/ship.mjs",
+    "release": "node scripts/release.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

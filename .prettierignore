@@ -4,6 +4,9 @@ pnpm-lock.yaml
 .agents/skills/
 .claude/skills/
 
+# Claude Code's per-user settings, ignored by git only through the global ignore file
+.claude/settings.local.json
+
 # Playwright output
 playwright-report/
 test-results/

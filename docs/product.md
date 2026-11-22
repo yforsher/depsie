@@ -45,7 +45,8 @@ A JavaScript or TypeScript developer choosing an npm package for a need in their
 | Platform 4: Accounts and limits                | 2, 3, 4, 5: needed for private reports and limits |
 | Platform 5: Saved reports and links            | 2                                                 |
 | Platform 6: History, freshness and export      | 3                                                 |
-| Platform 7: Observability and usage            | All: shows time, cost and errors                  |
+| Platform 7: Smoke test before release          | All: keeps the product working                    |
+| Platform 8: Observability and usage            | All: shows time, cost and errors                  |
 | Agents 1: Eval suite and baseline              | All: measures report quality                      |
 | Agents 2: Tool layer                           | 4, 5                                              |
 | Agents 3: Chat to refine a saved report        | 4                                                 |

@@ -63,6 +63,14 @@ pnpm e2e
 
 Against a deployment, with real data and one real report: `BASE_URL=https://... pnpm e2e`.
 
+## Release
+
+`pnpm ship -m "message"` lints, tests, commits all changes, pushes, opens a pull request if there
+is none and waits for its checks. It never merges.
+
+`pnpm release [number]` merges the pull request once every check passed (or picks up one merged on
+GitHub), then waits for the deploy and its smoke test and says whether the release is live.
+
 ## License
 
 MIT. See `LICENSE`.

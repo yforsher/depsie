@@ -14,7 +14,7 @@ Rules:
 - Every agent feature has a cost cap and a step limit in code, counts toward the user's daily cost
   cap, and is measured with the eval suite before it is turned on for everyone.
 - Existing functionality keeps working after every part: all existing tests and the smoke test
-  pass, in CI and against the live URL after the deploy. A test changes only when the behavior
+  pass, in CI and against the new revision before it gets traffic. A test changes only when the behavior
   change is intended, and the commit says why.
 - A new feature stays hidden behind a feature flag until it gives the user value on its own.
   Turning a flag on is the user's decision, recorded in this file with the date; the flag is

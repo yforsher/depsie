@@ -1,7 +1,9 @@
 name: CI
 
+# Pushes to a pull request run through pull_request only, so each push runs CI once.
 on:
   push:
+    branches: [master]
   pull_request:
 
 jobs:
