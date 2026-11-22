@@ -113,6 +113,9 @@ describe('App', () => {
       'Your package.json is read in your browser and is never sent.',
     );
     expect(privacy).toHaveTextContent('Nothing you send and no report is stored on our server.');
+    expect(privacy).toHaveTextContent(
+      'The server logs and traces, which only the operator can read, keep report ids, times, tokens and cost for 30 days',
+    );
 
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

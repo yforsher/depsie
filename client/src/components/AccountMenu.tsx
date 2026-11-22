@@ -50,6 +50,11 @@ export function AccountMenu() {
             </Link>
           </li>
           <li>
+            <Link to="/usage" onClick={() => setOpen(false)}>
+              Usage
+            </Link>
+          </li>
+          <li>
             <Link to="/account" onClick={() => setOpen(false)}>
               Account
             </Link>

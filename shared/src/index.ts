@@ -197,3 +197,22 @@ export interface SharedReport {
   deletable: boolean;
   olderFormat: boolean;
 }
+
+/** One UTC day of a signed-in user's AI usage. */
+export interface UsageDay {
+  /** YYYY-MM-DD, UTC. */
+  day: string;
+  /** Reports and refreshes run that day. */
+  reports: number;
+  /** Prompt and completion tokens together. */
+  tokens: number;
+  /** In US dollars. */
+  cost: number;
+}
+
+/** GET /api/usage: the last 30 UTC days with usage, newest first, and today's spend. */
+export interface UsageResponse {
+  days: UsageDay[];
+  todayCost: number;
+  dailyCap: number;
+}

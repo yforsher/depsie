@@ -3,10 +3,14 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
+import { SpanStatusCode } from '@opentelemetry/api';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from './app.js';
 import { MODEL } from './openrouter.js';
-import { claim, comparison, sourceResponse, usage } from './fixtures.js';
+import { claim, comparison, fakeFetch, sourceResponse, usage } from './fixtures.js';
+import { finishedSpans, recordSpans } from './testSpans.js';
+
+const spans = recordSpans();
 
 // Analytics write to an in-process Postgres built from the migrations (src/db/schema.ts).
 const db = vi.hoisted(() => ({ fail: false, client: undefined as PGlite | undefined }));
@@ -128,6 +132,7 @@ afterEach(async () => {
   db.fail = false;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  spans.reset();
 });
 
 describe('POST /api/report', () => {
@@ -176,7 +181,7 @@ describe('POST /api/report', () => {
   });
 
   it('returns 502 without a retry when the model cites a field that was not fetched', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const lines = logLines();
     const answer = comparison({
       ranking: [{ name: '@hookform/resolvers', pros: [claim('npm.stars')], cons: [] }],
     });
@@ -186,13 +191,13 @@ describe('POST /api/report', () => {
     expect(response.status).toBe(502);
     expect(response.body.error).toContain('not fetched: field @hookform/resolvers npm.stars');
     expect(aiCalls(fetchMock)).toBe(2);
-    const logged = consoleError.mock.calls.map(([line]) => String(line));
-    const output = logged.find((line) => line.startsWith('Rejected model output: '));
-    expect(JSON.parse(output!.slice('Rejected model output: '.length))).toEqual(answer);
+    const output = lines().find((l) => l.text.startsWith('Rejected model output: '));
+    expect(output!.severity).toBe('ERROR');
+    expect(JSON.parse(output!.text.slice('Rejected model output: '.length))).toEqual(answer);
   });
 
   it('returns 502 when OpenRouter fails', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const lines = logLines();
     const fetchMock = mockPipeline(comparison(), 500);
     const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
 
@@ -200,7 +205,9 @@ describe('POST /api/report', () => {
     expect(response.body.error).toMatch(/OpenRouter request failed with status 500/);
     expect(aiCalls(fetchMock)).toBe(1);
     // There is no model output to log, only the failed step.
-    expect(consoleError).not.toHaveBeenCalled();
+    expect(lines().map((l) => l.text)).not.toContainEqual(
+      expect.stringMatching(/^Rejected model output/),
+    );
   });
 
   it('gives both AI calls one deadline for the whole report', async () => {
@@ -283,15 +290,72 @@ describe('POST /api/report', () => {
   });
 });
 
-// Log lines as printed, with the request ID split off.
+// Log lines as printed: each one JSON object, with the trace id as the request id.
 function logLines() {
   const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
   return () =>
     consoleLog.mock.calls.map(([line]) => {
-      const [, id, text] = /^\[(\w+)\] (.*)$/s.exec(String(line))!;
-      return { id, text };
+      const { severity, message, traceId } = JSON.parse(String(line)) as Record<string, string>;
+      return { id: traceId, text: message!, severity };
     });
 }
+
+describe('request logging', () => {
+  it('gives a whole report only JSON lines with one trace id and a severity', async () => {
+    const lines = logLines();
+    vi.stubGlobal('fetch', vi.fn(fakeFetch));
+    await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    const logged = lines();
+    expect(logged.length).toBeGreaterThan(3);
+    expect(logged.every((l) => l.severity === 'INFO')).toBe(true);
+    expect(new Set(logged.map((l) => l.id)).size).toBe(1);
+    expect(logged[0]!.id).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it('logs an unexpected failure as one JSON line with its name, never its message', async () => {
+    const lines = logLines();
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.stubEnv('FEATURE_REPORT_LINKS', 'on');
+    db.fail = true;
+    const response = await request(createApp(clientDir)).get('/api/s/abc');
+    vi.unstubAllEnvs();
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: 'Something went wrong. Please try again later.' });
+    expect(lines().filter((l) => l.severity === 'ERROR')).toEqual([
+      {
+        id: expect.stringMatching(/^[0-9a-f]{32}$/),
+        text: 'request failed: Error',
+        severity: 'ERROR',
+      },
+    ]);
+    expect(JSON.stringify(lines())).not.toContain('database unreachable');
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it('keeps the status of a client error, such as malformed JSON', async () => {
+    logLines();
+    const response = await request(createApp(clientDir))
+      .post('/api/report')
+      .set('Content-Type', 'application/json')
+      .send('{"need":');
+
+    expect(response.status).toBe(400);
+  });
+
+  it.each(['/api/health', '/api/reports', '/'])('logs the response of %s', async (path) => {
+    const lines = logLines();
+    const app = createApp(clientDir);
+    await request(app).get(path);
+    await request(app).get(path);
+
+    const responses = lines().filter((l) => l.text.startsWith('response sent: '));
+    expect(responses).toHaveLength(2);
+    expect(responses[0]!.id).toMatch(/^[0-9a-f]{32}$/);
+    expect(responses[0]!.id).not.toBe(responses[1]!.id);
+  });
+});
 
 describe('POST /api/report logging', () => {
   it('logs each step once with the same request ID', async () => {
@@ -323,7 +387,6 @@ describe('POST /api/report logging', () => {
   });
 
   it('logs the failed step and the reason in one line', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
     const lines = logLines();
     mockPipeline(
       comparison({
@@ -371,6 +434,107 @@ describe('POST /api/report logging', () => {
   });
 });
 
+describe('traces', () => {
+  const STAGES = ['query_expansion', 'candidate_search', 'package_data', 'comparison'];
+  const aiAttributes = (step: string) => ({
+    'ai.step': step,
+    'ai.model': MODEL,
+    'ai.provider': expect.any(String),
+    'ai.prompt_tokens': expect.any(Number),
+    'ai.completion_tokens': expect.any(Number),
+    'ai.cost': expect.any(Number),
+  });
+
+  it('gives a whole report one trace with its stages, outside calls and AI calls', async () => {
+    const fetchMock = vi.fn(fakeFetch);
+    vi.stubGlobal('fetch', fetchMock);
+    await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    const all = await finishedSpans(spans);
+    expect(new Set(all.map((s) => s.spanContext().traceId)).size).toBe(1);
+    expect(all.filter((s) => s.name === 'POST /api/report')).toHaveLength(1);
+    for (const stage of STAGES) expect(all.filter((s) => s.name === stage)).toHaveLength(1);
+
+    const calls = all.filter((s) => 'url.full' in s.attributes);
+    expect(calls).toHaveLength(fetchMock.mock.calls.length);
+    for (const call of calls) {
+      const url = String(call.attributes['url.full']);
+      expect(call.name).toBe(new URL(url).host);
+      expect(url).not.toContain('?');
+      expect(call.attributes['http.response.status_code']).toEqual(expect.any(Number));
+    }
+    const aiCalls = all.filter((s) => 'ai.step' in s.attributes);
+    expect(aiCalls.map((s) => s.attributes)).toEqual([
+      expect.objectContaining(aiAttributes('query_expansion')),
+      expect.objectContaining(aiAttributes('comparison')),
+    ]);
+  });
+
+  it('keeps the tokens and cost of a rejected AI answer on its span, marked as an error', async () => {
+    mockPipeline({ not: 'a comparison' });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    const all = await finishedSpans(spans);
+    const rejected = all.find((s) => s.attributes['ai.step'] === 'comparison')!;
+    expect(rejected.attributes).toMatchObject({
+      'ai.prompt_tokens': usage.prompt_tokens,
+      'ai.completion_tokens': usage.completion_tokens,
+      'ai.cost': usage.cost,
+    });
+    expect(rejected.status.code).toBe(SpanStatusCode.ERROR);
+  });
+
+  // AI call 1 answers with the given content; every other outside call fails.
+  function failingPipeline(content: string) {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url.startsWith('https://openrouter.ai')
+          ? Response.json({ provider: 'DeepInfra', choices: [{ message: { content } }], usage })
+          : new Response('down', { status: 500 }),
+      ),
+    );
+  }
+
+  it.each([
+    [
+      'a failed npm search, whose URL holds the keywords',
+      '{"keywords":["secret words"],"packages":[]}',
+    ],
+    ['a rejected answer, whose message holds the model output', 'secret words, not JSON'],
+  ])('keeps the error message out of the spans of %s', async (_case, content) => {
+    failingPipeline(content);
+    const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    expect(response.status).toBe(502);
+    const recorded = JSON.stringify(
+      (await finishedSpans(spans)).map((s) => [s.name, s.attributes, s.events, s.status]),
+    );
+    expect(recorded).not.toMatch(/secret/);
+    expect(recorded).toContain('"error.type"');
+  });
+
+  it('never puts the need or a dependency name in a span', async () => {
+    vi.stubGlobal('fetch', vi.fn(fakeFetch));
+    const need = 'a secret internal need';
+    await request(createApp(clientDir))
+      .post('/api/report')
+      .send({
+        need,
+        framework: 'React',
+        dependencies: [{ name: 'private-dep-name', range: '^1.0.0' }],
+      });
+
+    const recorded = JSON.stringify(
+      (await finishedSpans(spans)).map((s) => [s.name, s.attributes, s.events, s.status]),
+    );
+    expect(recorded).not.toContain(need);
+    expect(recorded).not.toContain('private-dep-name');
+  });
+});
+
 describe('AI usage', () => {
   const row = (source: string) => ({
     user_id: null,
@@ -390,7 +554,7 @@ describe('AI usage', () => {
   });
 
   it('writes the row of a call whose answer is rejected', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
     mockPipeline({ not: 'a comparison' });
     const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
 
@@ -498,10 +662,12 @@ describe('analytics', () => {
 
     expect(response.status).toBe(200);
     await vi.waitFor(() =>
-      expect(lines()).toContainEqual({
-        id: 'analytics',
-        text: 'analytics failed: database unreachable',
-      }),
+      expect(lines()).toContainEqual(
+        expect.objectContaining({
+          severity: 'ERROR',
+          text: 'analytics failed: database unreachable',
+        }),
+      ),
     );
   });
 });

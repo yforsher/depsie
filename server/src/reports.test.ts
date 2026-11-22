@@ -4,13 +4,17 @@ import { join } from 'node:path';
 import { sql } from 'drizzle-orm';
 import { type Report, REPORT_SCHEMA_VERSION } from 'shared';
 import request from 'supertest';
+import { SpanKind } from '@opentelemetry/api';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from './app.js';
 import { deleteExpiredReports } from './cleanup.js';
 import { db, openDatabase } from './db/client.js';
 import { fakeFetch } from './fixtureResponses.js';
 import { appendVersion } from './reports.js';
+import { finishedSpans, recordSpans } from './testSpans.js';
 import { signedInUser } from './testUsers.js';
+
+const spans = recordSpans();
 
 const clientDir = mkdtempSync(join(tmpdir(), 'client-dist-'));
 writeFileSync(join(clientDir, 'index.html'), '<div id="root"></div>');
@@ -33,6 +37,8 @@ beforeAll(async () => {
 
 afterEach(async () => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  spans.reset();
   await db().execute(sql`delete from reports`);
   await db().execute(sql`delete from "user"`);
   await db().execute(sql`delete from ai_usage`);
@@ -733,5 +739,50 @@ describe('cleanup', () => {
       { report_id: current },
     ]);
     expect(expired).not.toBe(current);
+  });
+});
+
+describe('report ids in traces and logs', () => {
+  // The request span of the last request, and the log messages printed so far.
+  async function requestSpan(requests: number) {
+    const server = (await finishedSpans(spans, requests)).filter((s) => s.kind === SpanKind.SERVER);
+    return server.at(-1)!;
+  }
+  const messages = (consoleLog: { mock: { calls: unknown[][] } }) =>
+    consoleLog.mock.calls.map(
+      ([line]) => (JSON.parse(String(line)) as { message: string }).message,
+    );
+
+  it('puts the id of a saved report on its request span and in a log line', async () => {
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const response = await request(appWith({ reportLinks: 'on' }))
+      .post('/api/report')
+      .send(body);
+    const id = response.body.saved.id as string;
+
+    expect((await requestSpan(1)).attributes['report.id']).toBe(id);
+    expect(messages(consoleLog)).toContain(`report saved: ${id}`);
+  });
+
+  it('puts the id of a refreshed report on its request span, and no user id in any span', async () => {
+    const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const app = appWith({ accounts: 'on' });
+    const alice = await signedInUser('alice');
+    const { id } = (await request(app).post('/api/report').set('Cookie', alice.cookie).send(body))
+      .body.saved as { id: string };
+    await request(app).post(`/api/reports/${id}/refresh`).set('Cookie', alice.cookie);
+
+    expect((await requestSpan(2)).attributes['report.id']).toBe(id);
+    expect(messages(consoleLog).filter((m) => m === `report saved: ${id}`)).toHaveLength(2);
+    const recorded = JSON.stringify(
+      spans.getFinishedSpans().map((s) => [s.name, s.attributes, s.events, s.status]),
+    );
+    expect(recorded).not.toContain(alice.id);
+  });
+
+  it('puts no report id on the span of a report that is not saved', async () => {
+    await request(appWith({})).post('/api/report').send(body);
+
+    expect((await requestSpan(1)).attributes).not.toHaveProperty('report.id');
   });
 });

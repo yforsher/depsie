@@ -25,7 +25,7 @@ the structured report in the browser, with no AI call and no server request.
 `POST /api/report` with `{ need, framework, dependencies? }` returns `{ report, saved }` (types in
 `shared/`; `saved` is null when the report was not saved),
 `POST`/`DELETE /api/reports/:id/share` (create or revoke a link), `GET /api/reports` (the user's
-reports), `GET /api/reports/:id?version=N` (the owner's report, latest or version N),
+reports), `GET /api/usage` (the user's AI usage per day and today's spend against the cap), `GET /api/reports/:id?version=N` (the owner's report, latest or version N),
 `DELETE /api/reports/:id`, `POST /api/reports/:id/refresh` (a new version, with the same errors
 as a new report), `GET`/`DELETE /api/s/:shareId` (a shared report, delete by link),
 and `GET /api/features` for the flags on for this visitor and `signIn` (sign-in exists, so
@@ -83,8 +83,8 @@ label or icon, never color alone.
   `/` is the report app; `/signin` is the sign-in page while sign-in exists, and redirects home
   otherwise; `/account` is the signed-in user's page, and redirects anyone else to `/signin`
   while sign-in exists, else home; `/reports` lists the signed-in user's reports and
-  `/reports/$id` (`?version=N` for an earlier version) is one of them, both redirecting the same
-  way; `/s/$shareId` is a shared report for anyone. Any unknown path redirects home (the root route's
+  `/reports/$id` (`?version=N` for an earlier version) is one of them, and `/usage` is the
+  user's AI usage, all redirecting the same way; `/s/$shareId` is a shared report for anyone. Any unknown path redirects home (the root route's
   `notFoundComponent`). Redirects replace the history entry, so Back does not return to them.
   Pages that depend on the flags or the user render nothing until both are known, so a
   signed-in user is never sent away by mistake. The server returns the app shell for every non-API path.
@@ -93,7 +93,7 @@ label or icon, never color alone.
   `GET /api/me` only while `accounts` is on for this visitor.
 - `src/components/AccountMenu.tsx`: the right end of the top bar, only while `accounts` is on for
   this visitor: a Sign in link styled as a quiet secondary button (not on `/signin` or `/account`),
-  or the avatar with a menu (Reports, Account, Sign out). Signing out reads the
+  or the avatar with a menu (Reports, Usage, Account, Sign out). Signing out reads the
   flags and the user again, since a login list can depend on the user.
 - `src/components/SignInPage.tsx`: what Depsie reads (name, avatar, email), no repository access,
   how to revoke it in GitHub, the privacy note, a way back, in one panel; the GitHub button
@@ -111,12 +111,15 @@ label or icon, never color alone.
   turns 400, 429, 502, 503 and any other failure status into a clear error message;
   `fetchFeatures()` reads `GET /api/features`; `changeShareLink()`, `fetchOwnedReport()` and
   `fetchSharedReport()` (null on 404), `deleteSharedReport()`; `fetchReports()`, `deleteReport()` and
-  `refreshReport()` (its errors read as `fetchReport()`'s).
+  `refreshReport()` (its errors read as `fetchReport()`'s); `fetchUsage()`.
 - `src/components/ShareControls.tsx`: under a saved report (the result on `/`, with `openLink`, and
   `/reports/$id`): Create share link, then the link with a copy button and the deletion date; for
   a signed-in owner (`saved.owned`) also Revoke link, and on `/` a link to the saved report.
 - `src/components/ReportsPage.tsx`: the user's reports, most recently updated first: need (a link
   to the report), framework, date, version count and Shared, with Delete; an empty list says so.
+- `src/components/UsagePage.tsx`: "Today: $x of $0.25" (dollars with up to four decimals, since a
+  report costs about $0.002), then one table row per UTC day of the last 30 days with usage, newest
+  first: date, reports, tokens and cost; with no usage it says so.
 - `src/components/DeleteButton.tsx`: Delete, then Delete permanently or Cancel; used by the reports
   list and the report page.
 - `src/components/SavedReportPage.tsx`: the owner's report, latest version or the one in

@@ -17,7 +17,7 @@ export const ANONYMOUS_DAILY_COST = 1;
 export const UNAVAILABLE = 'Reports are unavailable right now.';
 
 // Today in UTC, as ai_usage stores it (YYYY-MM-DD).
-function utcToday() {
+export function utcToday() {
   return new Date().toISOString().slice(0, 10);
 }
 
@@ -38,7 +38,7 @@ export const checkCostCap: RequestHandler = async (_req, res, next) => {
   try {
     spent = await costToday(userId);
   } catch (error) {
-    log(`cost check failed: ${(error as Error).message}`);
+    log(`cost check failed: ${(error as Error).message}`, 'ERROR');
     res.status(503).json({ error: UNAVAILABLE });
     return;
   }

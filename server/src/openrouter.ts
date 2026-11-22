@@ -1,5 +1,7 @@
 import * as z from 'zod';
+import type { Span } from '@opentelemetry/api';
 import { log, secondsSince } from './log.js';
+import { callAttributes, withSpan } from './tracing.js';
 import { recordAiUsage } from './usage.js';
 
 // OPENROUTER_MODEL is set only for the model comparison runs; production leaves it unset.
@@ -41,7 +43,25 @@ interface Usage {
   cost: number;
 }
 
-export async function chatJson<T extends z.ZodType>(
+const CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+// One span per AI call, named for the host like every outside call, which also holds the step,
+// model, tokens and cost; a rejected answer leaves them on a span marked as an error.
+export function chatJson<T extends z.ZodType>(
+  name: string,
+  schema: T,
+  system: string,
+  user: string,
+  signal: AbortSignal,
+): Promise<z.infer<T>> {
+  const attributes = { ...callAttributes(CHAT_URL), 'ai.step': name, 'ai.model': MODEL };
+  return withSpan(new URL(CHAT_URL).host, attributes, (span) =>
+    callModel(span, name, schema, system, user, signal),
+  );
+}
+
+async function callModel<T extends z.ZodType>(
+  span: Span,
   name: string,
   schema: T,
   system: string,
@@ -49,7 +69,7 @@ export async function chatJson<T extends z.ZodType>(
   signal: AbortSignal,
 ): Promise<z.infer<T>> {
   const start = performance.now();
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const res = await fetch(CHAT_URL, {
     method: 'POST',
     signal,
     headers: {
@@ -71,6 +91,7 @@ export async function chatJson<T extends z.ZodType>(
       },
     }),
   }).catch(timedOut(name));
+  span.setAttribute('http.response.status_code', res.status);
   if (!res.ok) {
     throw new AiError(
       name,
@@ -84,6 +105,12 @@ export async function chatJson<T extends z.ZodType>(
     usage: Usage;
   };
   const { prompt_tokens, completion_tokens, cost } = data.usage;
+  span.setAttributes({
+    'ai.provider': data.provider,
+    'ai.prompt_tokens': prompt_tokens,
+    'ai.completion_tokens': completion_tokens,
+    'ai.cost': cost,
+  });
   recordAiUsage(name, MODEL, prompt_tokens, completion_tokens, cost);
   log(
     `${name} done in ${secondsSince(start)} by ${data.provider}: ${prompt_tokens} prompt + ${completion_tokens} completion tokens, $${cost.toFixed(5)}`,

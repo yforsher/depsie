@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { findCandidates } from './candidates.js';
 import { AiError, chatJson } from './openrouter.js';
 import { log, secondsSince } from './log.js';
+import { withSpan } from './tracing.js';
 import {
   fetchPackageData,
   type PackageData,
@@ -327,12 +328,15 @@ const REPORT_TIMEOUT_MS = 90_000;
 export async function generateReport(request: ReportRequest): Promise<Report> {
   const signal = AbortSignal.timeout(REPORT_TIMEOUT_MS);
   const candidates = await findCandidates(request, signal);
-  const start = performance.now();
-  const packages = await Promise.all(candidates.map(fetchPackageData));
-  log(
-    `data fetched for ${packages.length} candidates in ${secondsSince(start)}; failed sources: ${failedSources(packages).join(', ') || 'none'}`,
-  );
-  return compareCandidates(request, packages, signal);
+  const packages = await withSpan('package_data', {}, async () => {
+    const start = performance.now();
+    const packages = await Promise.all(candidates.map(fetchPackageData));
+    log(
+      `data fetched for ${packages.length} candidates in ${secondsSince(start)}; failed sources: ${failedSources(packages).join(', ') || 'none'}`,
+    );
+    return packages;
+  });
+  return withSpan('comparison', {}, () => compareCandidates(request, packages, signal));
 }
 
 function failedSources(packages: PackageData[]): string[] {

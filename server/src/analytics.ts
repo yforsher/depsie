@@ -47,7 +47,7 @@ async function insert(ip: string, event: Event) {
 // DATABASE_URL, is only logged.
 function record(req: Request, event: Event) {
   insert(req.ip ?? '', event).catch((error: Error) =>
-    log(`analytics failed: ${error.message}`, 'analytics'),
+    log(`analytics failed: ${error.message}`, 'ERROR'),
   );
 }
 

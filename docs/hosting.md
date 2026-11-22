@@ -108,6 +108,38 @@ Uptime: `.github/workflows/uptime.yml` calls `/api/health` every 6 hours, and Gi
 fails. Cloud Monitoring uptime checks are not used: they run at least every 15 minutes, which would
 keep the instance up and billed all month.
 
+## Logs and traces
+
+The server writes one JSON line per log entry on stdout, which Cloud Run sends to Cloud Logging,
+and exports a trace of every request to Cloud Trace (`server/AGENTS.md`, `src/log.ts` and
+`src/tracing.ts`). Both are operator-only and kept 30 days by Google Cloud.
+
+Setup, once per project (the Telemetry API was already enabled on 2026-11-22):
+
+```sh
+gcloud services enable telemetry.googleapis.com
+gcloud projects add-iam-policy-binding <project id> \
+  --member=serviceAccount:<project number>-compute@developer.gserviceaccount.com \
+  --role=roles/telemetry.tracesWriter
+```
+
+The Deploy step sets `GOOGLE_CLOUD_PROJECT`, which the export (`gcp.project_id`, required by the
+endpoint) and the log lines' trace field need. Spans go to
+`https://telemetry.googleapis.com/v1/traces` in batches after the response: billing is
+instance-based, so CPU stays allocated between requests (`gcloud run services describe depsie`
+shows `run.googleapis.com/cpu-throttling: 'false'`, checked 2026-11-22). With request-based
+billing the batch could wait unsent until the next request; the fix would be
+`--no-cpu-throttling`, not a flush in the request path. Spans still waiting are sent on `SIGTERM`
+before an instance stops. Export failures are logged by the SDK and never fail a request.
+
+Finding a report:
+
+- Trace: Trace Explorer, filter bar, "Add attribute filter", key `report.id`, value the report
+  id. The trace shows the request span, the four stages, each outside call and each AI call with
+  its tokens and cost.
+- Logs: Logs Explorer, `jsonPayload.message="report saved: <id>"`; the line's trace link opens
+  the trace, and "Show entries for this trace" lists every line of the request.
+
 ## Report cleanup job
 
 Expired reports are deleted by the Cloud Run job `depsie-cleanup`, not by an endpoint: it runs
@@ -173,4 +205,9 @@ afterwards.
 - [Cloud Run rollouts, rollbacks and traffic migration](https://docs.cloud.google.com/run/docs/rollouts-rollbacks-traffic-migration)
 - [Cloud Run continuous deployment](https://docs.cloud.google.com/run/docs/continuous-deployment)
 - [Cloud Run release notes (build script runs by default)](https://docs.cloud.google.com/run/docs/release-notes?hl=en)
+- [OTLP export to Google Cloud (MIGRATION.md)](https://github.com/GoogleCloudPlatform/opentelemetry-operations-js/blob/main/MIGRATION.md)
+- [Telemetry API OTLP overview](https://docs.cloud.google.com/stackdriver/docs/otlp/overview)
+- [Telemetry API roles](https://docs.cloud.google.com/iam/docs/roles-permissions/telemetry)
+- [Structured logging](https://docs.cloud.google.com/logging/docs/structured-logging)
+- [Find and explore traces](https://docs.cloud.google.com/trace/docs/finding-traces)
 - [Express trust proxy on Cloud Run (community pull request)](https://github.com/Menshawy97/FORJD/pull/192)

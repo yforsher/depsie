@@ -1,11 +1,13 @@
 // One fetcher per outside source. Each returns plain data and throws on any failure;
 // packageData.ts turns a failure into an unavailable source instead of a failed request.
 
+import { tracedFetch } from './tracing.js';
+
 const TIMEOUT_MS = 10_000;
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
 async function get(url: string, init: RequestInit = {}): Promise<Response> {
-  const res = await fetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  const res = await tracedFetch(url, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!res.ok) throw new Error(`${url} returned status ${res.status}`);
   return res;
 }

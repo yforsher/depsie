@@ -23,6 +23,7 @@ describe('account menu', () => {
     await user.click(await screen.findByRole('button', { name: 'Account menu for Alice' }));
 
     expect(screen.getByRole('link', { name: 'Reports' })).toHaveAttribute('href', '/reports');
+    expect(screen.getByRole('link', { name: 'Usage' })).toHaveAttribute('href', '/usage');
     expect(screen.getByRole('link', { name: 'Account' })).toHaveAttribute('href', '/account');
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();

@@ -22,6 +22,11 @@ The server is the only place that holds API keys (`OPENROUTER_API_KEY`, `GITHUB_
   unexpired reports as `ReportSummary[]` (need, framework, latest version time, version count,
   whether shared), most recently updated first; 401 without a session, since there is no id to
   hide.
+- `GET /api/usage` (same flag): the signed-in user's AI usage from `ai_usage` only, as
+  `UsageResponse` (`shared/`): per UTC day with usage in the last 30 days, newest first, the
+  reports run (rows with source `query_expansion`: every report and refresh makes that call once),
+  tokens (prompt plus completion) and cost, plus today's cost and the daily cap
+  (`USER_DAILY_COST`); `usageOf()` in `src/usage.ts`. 401 without a session.
 - `GET /api/reports/:id?version=N` (same flag): the owner's report as `OwnedReport`, version N or
   the latest without `version`, with `version` (the one shown) and `versions` (number, source,
   time, oldest first). Missing, expired, another user's, anonymous or non-uuid ids, and a version
@@ -147,14 +152,40 @@ failing the request.
 - `src/users.ts`: `loadUser(auth)` puts the session's user in `res.locals.user` (the only source of
   the user: never an id from the request), forwards the renewed session cookie Better Auth sends
   when it extends a session, and answers 503 when the session cannot be read (database down).
-- `src/log.ts`: `log()` prints one line prefixed with the request ID, kept in an
-  `AsyncLocalStorage` set by the `requestLogging` middleware on `POST /api/report`, so pipeline
-  code can log without passing the ID around. Lines: request received, each AI call (duration,
-  tokens, cost), data fetched (failed sources), the failed step and reason, response sent (status,
-  total duration). Never the need text or dependency names.
+- `src/log.ts`: `log(message, severity)` prints one JSON line (`severity` `INFO` or `ERROR`,
+  `message`). During a request it adds `traceId`, the request id, read from the active span, so
+  any code can log without passing an id around; when `GOOGLE_CLOUD_PROJECT` is set (the deploy
+  sets it) it also adds `logging.googleapis.com/trace`, `spanId` and `trace_sampled`, which group
+  the line under its trace in Cloud Logging. Lines: request received, each AI call (duration,
+  tokens, cost), data fetched (failed sources), the failed step and reason, the rejected model
+  output (`ERROR`), response sent (status, total duration) for every request. Never the need text,
+  dependency names or a user id.
+- `src/tracing.ts`: `startTracing()` (called by `index.ts` before `createApp()`, and by tests)
+  registers the tracer provider, sampling every request, and the AsyncLocalStorage context
+  manager. `cloudTraceExport(env)` gives it, only when `K_SERVICE` is set (Cloud Run), a batch
+  processor with the OTLP exporter to `https://telemetry.googleapis.com/v1/traces` (token from
+  `google-auth-library`) and the resource attributes `gcp.project_id` (from
+  `GOOGLE_CLOUD_PROJECT`) and `service.name`; elsewhere nothing is exported. `index.ts` shuts the
+  provider down on `SIGTERM`, sending pending spans. Setup and how to find a report's trace:
+  `docs/hosting.md`, Logs and traces. `requestSpan`, the first middleware in `createApp()`, starts a new root span for every
+  request (Cloud Run's incoming trace is not continued), logs `response sent`, and on close names
+  the span by method and route pattern (never the path, which can hold report or share ids) and
+  ends it. `withSpan(name, attributes, fn)` runs `fn` in a child span and marks it as an error
+  when `fn` throws, with only `error.type` (the error's name): messages can hold the npm search
+  query or model output, so they stay in the failure's log line, which has the same trace id. Spans of a report: the four stages `query_expansion` and `candidate_search`
+  (`candidates.ts`), `package_data` and `comparison` (`report.ts`); one span per outside call
+  through `tracedFetch()` (`get()` in `sources.ts`, the npm calls in `candidates.ts`), named for
+  the host, with `url.full` without its query string (the npm search query holds keywords
+  derived from the need) and `http.response.status_code`; and one span per AI call in
+  `chatJson()`, named `openrouter.ai`, with `ai.step`, `ai.model`, `ai.provider`,
+  `ai.prompt_tokens`, `ai.completion_tokens` and `ai.cost`, set as soon as OpenRouter reports the
+  usage, so a rejected answer keeps them on its error span. Once a report is saved or refreshed,
+  `app.ts` sets `report.id` on the request span and logs `report saved: <id>`, so a report id
+  leads to its trace. Spans hold candidate package names (public) but never the need, the user's
+  dependency names or a user id. `src/testSpans.ts` (tests only) keeps finished spans in memory.
 - `src/analytics.ts`: records a `visit` when the app shell is served and a `report` row when a
   `POST /api/report` response finishes (any status, including 400 and 429), with the framework,
-  and no tokens or cost: those are only in `ai_usage`, where they would otherwise let a
+  and no tokens or cost: in the database those are only in `ai_usage`, where they would otherwise let a
   signed-in user's calls be matched to this anonymous row. The visitor is
   a SHA-256 hash of the IP with a salt kept in memory and replaced each UTC day; country comes
   from `geoip-country` (bundled GeoLite2 data, no outside call). Writes go through `db()` from
@@ -206,8 +237,11 @@ failing the request.
   client cannot fake it.
 - `POST /api/report` in `src/app.ts`: rate limited to 10 per hour per signed-in user, else per IP
   (429), then the daily cost cap (`checkCostCap`), Zod validation (400), then `generateReport()`; `AiError` becomes 502
-  with the message, and the rejected model output is logged to the console (never stored) so
-  failures can be investigated.
+  with the message, and the rejected model output is logged as an `ERROR` line (never stored, and
+  never on a span) so failures can be investigated. The last error handler in `createApp()` answers
+  any other failure with a JSON 500 and logs only the error's name (`request failed: <name>`): a
+  database error's message lists the query parameters and a JSON parse error quotes the body,
+  which can hold the need. A client error (4xx, such as malformed JSON) keeps its status.
 - `src/limits.ts`: every limit on reports as a constant (reports per hour, the daily AI cost cap of
   $0.25 per signed-in user and $1 shared by all anonymous use) and `checkCostCap`, which sums
   today's (UTC) `ai_usage.cost` for the user, or for all anonymous use, before any AI call: 429 at

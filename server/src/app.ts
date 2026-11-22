@@ -5,6 +5,7 @@ import express, {
   type RequestHandler,
   type Response,
 } from 'express';
+import { trace } from '@opentelemetry/api';
 import { toNodeHandler } from 'better-auth/node';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import {
@@ -20,7 +21,7 @@ import { createAuth } from './auth.js';
 import { NpmError } from './candidates.js';
 import { enabledFor, isOn, readFlags } from './features.js';
 import { checkCostCap, REPORTS_PER_HOUR } from './limits.js';
-import { log, requestLogging } from './log.js';
+import { log } from './log.js';
 import { AiError } from './openrouter.js';
 import { generateReport } from './report.js';
 import {
@@ -36,7 +37,8 @@ import {
   revokeShareLink,
   saveReport,
 } from './reports.js';
-import { setUsageReport, usageUser } from './usage.js';
+import { requestSpan } from './tracing.js';
+import { setUsageReport, usageOf, usageUser } from './usage.js';
 import { loadUser, type User } from './users.js';
 
 export function createApp(clientDir: string) {
@@ -45,6 +47,8 @@ export function createApp(clientDir: string) {
   // req.ip, used by the rate limit and analytics, is the last entry; earlier entries come from the
   // client and are ignored.
   app.set('trust proxy', 1);
+  // First, so every request has its span and every log line its trace id.
+  app.use(requestSpan);
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok' });
@@ -105,6 +109,15 @@ export function createApp(clientDir: string) {
       res.json(me);
     });
 
+    app.get('/api/usage', ...withUser, requireAccounts, async (_req, res) => {
+      const user = res.locals.user as User | undefined;
+      if (!user) {
+        res.status(401).json({ error: 'Sign in to see your usage.' });
+        return;
+      }
+      res.json(await usageOf(user.id));
+    });
+
     // 401, not 404, without a session: there is no report id to hide.
     app.get('/api/reports', ...withUser, requireAccounts, async (_req, res) => {
       const user = res.locals.user as User | undefined;
@@ -163,7 +176,6 @@ export function createApp(clientDir: string) {
     // Runs the pipeline again with the saved inputs and appends a refresh version.
     app.post(
       '/api/reports/:id/refresh',
-      requestLogging,
       ...withUser,
       requireAccounts,
       ownReportInputs,
@@ -176,6 +188,7 @@ export function createApp(clientDir: string) {
         log(`refresh received: framework ${inputs.framework}`);
         setUsageReport(req.params.id);
         await appendVersion(req.params.id, user.id, await generateReport(inputs));
+        markSaved(req.params.id);
         res.json(await findOwnedReport(req.params.id, user.id));
       },
     );
@@ -233,7 +246,6 @@ export function createApp(clientDir: string) {
 
   app.post(
     '/api/report',
-    requestLogging,
     reportAnalytics,
     ...withUser,
     usageUser,
@@ -260,6 +272,7 @@ export function createApp(clientDir: string) {
       if (save && (owner !== null || !user)) setUsageReport(id);
       const report = await generateReport(parsed.data);
       const saved = save ? await saveReport(id, owner, parsed.data, report) : null;
+      if (saved) markSaved(id);
       res.json({ report, saved } satisfies ReportResponse);
     },
   );
@@ -277,20 +290,48 @@ export function createApp(clientDir: string) {
 
   app.use(aiErrorHandler);
   app.use(npmErrorHandler);
+  app.use(unexpectedErrorHandler);
 
   return app;
 }
 
+// Last: any other failure. Only the error's name is logged: a database error's message lists the
+// query parameters and a JSON parse error quotes the body, both of which can hold the need.
+const unexpectedErrorHandler: ErrorRequestHandler = (
+  error: Error & { status?: number },
+  _req,
+  res,
+  next,
+) => {
+  // Too late for a JSON answer: Express's own handler closes the connection.
+  if (res.headersSent) return next(error);
+  // Client errors keep their status, for example 400 for malformed JSON from express.json().
+  if (error.status && error.status < 500) {
+    log(`request refused: ${error.name}`);
+    res.status(error.status).json({ error: 'The request could not be read.' });
+    return;
+  }
+  log(`request failed: ${error.name}`, 'ERROR');
+  res.status(500).json({ error: 'Something went wrong. Please try again later.' });
+};
+
+// Leads from a report id to its trace: Cloud Trace finds the request span by this attribute, and
+// Cloud Logging finds the line, which carries the trace id.
+function markSaved(id: string) {
+  trace.getActiveSpan()?.setAttribute('report.id', id);
+  log(`report saved: ${id}`);
+}
+
 const aiErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
   if (!(error instanceof AiError)) return next(error);
-  log(`${error.step} failed: ${error.message}`);
-  if (error.modelOutput) console.error(`Rejected model output: ${error.modelOutput}`);
+  log(`${error.step} failed: ${error.message}`, 'ERROR');
+  if (error.modelOutput) log(`Rejected model output: ${error.modelOutput}`, 'ERROR');
   res.status(502).json({ error: `The AI step failed: ${error.message}` });
 };
 
 const npmErrorHandler: ErrorRequestHandler = (error, _req, res, next) => {
   if (!(error instanceof NpmError)) return next(error);
-  log(`npm search failed: ${error.message}`);
+  log(`npm search failed: ${error.message}`, 'ERROR');
   res.status(502).json({ error: error.message });
 };
 

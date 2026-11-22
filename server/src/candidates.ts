@@ -1,6 +1,7 @@
 import type { ReportRequest } from 'shared';
 import * as z from 'zod';
 import { chatJson } from './openrouter.js';
+import { tracedFetch, withSpan } from './tracing.js';
 
 export const MAX_CANDIDATES = 5;
 const REGISTRY = 'https://registry.npmjs.org';
@@ -35,7 +36,7 @@ const TIMEOUT_MS = 10_000;
 export class NpmError extends Error {}
 
 async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(
+  const res = await tracedFetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) }).catch(
     (error: unknown) => {
       if (error instanceof Error && error.name === 'TimeoutError') {
         throw new NpmError(`The npm registry did not answer within ${TIMEOUT_MS / 1000}s`);
@@ -66,17 +67,15 @@ export async function findCandidates(
   request: ReportRequest,
   signal: AbortSignal,
 ): Promise<Candidate[]> {
-  const { keywords, packages } = await chatJson(
-    'query_expansion',
-    expansionSchema,
-    SYSTEM_PROMPT,
-    userPrompt(request),
-    signal,
+  const { keywords, packages } = await withSpan('query_expansion', {}, () =>
+    chatJson('query_expansion', expansionSchema, SYSTEM_PROMPT, userPrompt(request), signal),
   );
-  const [named, searched] = await Promise.all([
-    Promise.all(packages.slice(0, MAX_CANDIDATES).map(resolveLatest)),
-    Promise.all(keywords.slice(0, 3).map(search)),
-  ]);
+  const [named, searched] = await withSpan('candidate_search', {}, () =>
+    Promise.all([
+      Promise.all(packages.slice(0, MAX_CANDIDATES).map(resolveLatest)),
+      Promise.all(keywords.slice(0, 3).map(search)),
+    ]),
+  );
 
   const byName = new Map<string, Candidate>();
   for (const candidate of [...named, ...searched.flat()]) {

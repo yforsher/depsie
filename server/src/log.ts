@@ -1,23 +1,26 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
-import { randomUUID } from 'node:crypto';
-import type { RequestHandler } from 'express';
+import { isSpanContextValid, trace } from '@opentelemetry/api';
 
-const requestIds = new AsyncLocalStorage<string>();
+export type Severity = 'INFO' | 'ERROR';
 
-// Every line starts with the request ID so the lines of one request can be followed together.
-// Lines never contain the need text or dependency names.
-export function log(line: string, id = requestIds.getStore()) {
-  console.log(`[${id}] ${line}`);
+// One JSON line per call on stdout, which Cloud Run hands to Cloud Logging. During a request the
+// line carries the trace id (the request id), and on Cloud Run the fields that group it with its
+// trace. Lines never contain the need text, dependency names or a user id.
+export function log(message: string, severity: Severity = 'INFO') {
+  const line: Record<string, unknown> = { severity, message };
+  const span = trace.getActiveSpan()?.spanContext();
+  if (span && isSpanContextValid(span)) {
+    line.traceId = span.traceId;
+    const project = process.env.GOOGLE_CLOUD_PROJECT;
+    if (project) {
+      line['logging.googleapis.com/trace'] = `projects/${project}/traces/${span.traceId}`;
+      line['logging.googleapis.com/spanId'] = span.spanId;
+      // Every request is traced (AlwaysOnSampler).
+      line['logging.googleapis.com/trace_sampled'] = true;
+    }
+  }
+  console.log(JSON.stringify(line));
 }
 
 export function secondsSince(start: number): string {
   return `${((performance.now() - start) / 1000).toFixed(1)}s`;
 }
-
-export const requestLogging: RequestHandler = (_req, res, next) => {
-  const id = randomUUID().slice(0, 8);
-  const start = performance.now();
-  // 'finish' fires outside the request's async context, so the ID is passed explicitly.
-  res.on('finish', () => log(`response sent: ${res.statusCode} in ${secondsSince(start)}`, id));
-  requestIds.run(id, next);
-};
