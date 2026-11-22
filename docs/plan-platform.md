@@ -328,6 +328,9 @@ new revision is smoke-tested first and gets traffic only if it passes.
     Corepack (Corepack's npm package collides with the image's `yarn`), so the step installs the
     pnpm version named in `packageManager` with npm. `gcloud builds submit` needed
     `roles/storage.objectViewer` for the compute service account on the `_cloudbuild` bucket.
+  - First gated deploy (PR #21, build `4230ccac`, 2026-11-22): all 7 steps passed in 4:45, Smoke
+    ran 2 tests in 50 seconds against the candidate, Promote gave `depsie-00038-sov` all traffic,
+    and the service template and the cleanup job run the merge commit's image.
 
 - [ ] `cloudbuild.yaml`: Deploy creates the new revision with no traffic and the tag `candidate`;
       a new Smoke step runs `pnpm e2e` with `BASE_URL` set to the candidate URL; a new Promote step
