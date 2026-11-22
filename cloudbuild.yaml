@@ -1,6 +1,7 @@
 # Continuous deployment of the Cloud Run service (docs/hosting.md): build, push, migrate the
-# production database, deploy. Steps run in order and a failed step ends the build, so a failed
-# migration means no deploy and the previous revision keeps serving.
+# production database, deploy a candidate revision with no traffic, smoke-test it, promote it.
+# Steps run in order and a failed step ends the build, so a failed migration or smoke test means
+# users keep the previous revision.
 steps:
   - id: Build
     name: gcr.io/cloud-builders/docker
@@ -26,9 +27,34 @@ steps:
       - --image=$_IMAGE
       - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
       - --region=$_DEPLOY_REGION
+      - --no-traffic
+      - --tag=candidate
       - --quiet
-  # The daily cleanup job (docs/hosting.md) runs the image just deployed, so its code always matches
-  # the live revision and the migrated schema.
+  # The image tag follows @playwright/test in package.json. The image has no Corepack, so pnpm is
+  # installed at the version in packageManager. BASE_URL makes Playwright skip the local server.
+  - id: Smoke
+    name: mcr.microsoft.com/playwright:v1.65.0-noble
+    entrypoint: bash
+    args:
+      - -c
+      - npm install -g $$(node -p "require('./package.json').packageManager") && pnpm install --frozen-lockfile --filter depsie && pnpm e2e
+    env: [CI=true, 'BASE_URL=${_CANDIDATE_URL}']
+  # By tag, so traffic goes to the revision just tested, not to whatever is latest.
+  - id: Promote
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      [
+        run,
+        services,
+        update-traffic,
+        $_SERVICE_NAME,
+        --to-tags=candidate=100,
+        --region=$_DEPLOY_REGION,
+        --quiet,
+      ]
+  # The daily cleanup job (docs/hosting.md) runs the image just promoted, so it never runs code that
+  # did not pass the smoke test, and matches the live revision and the migrated schema.
   - id: Update cleanup job
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: gcloud
@@ -48,6 +74,8 @@ substitutions:
   _DEPLOY_REGION: europe-west1
   _SERVICE_NAME: depsie
   _TRIGGER_ID: 1f0f25c0-7704-4c85-96e6-c320e5fc7083
+  # A tag's URL is https://<tag>---<service host>.
+  _CANDIDATE_URL: https://candidate---depsie-kud34vyt4q-ew.a.run.app
   _IMAGE: ${_AR_HOSTNAME}/${PROJECT_ID}/${_AR_REPOSITORY}/${REPO_NAME}/${_SERVICE_NAME}:${COMMIT_SHA}
 
 options:

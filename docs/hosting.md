@@ -10,14 +10,67 @@ Deploy with continuous deployment from GitHub (Cloud Build). Cloud Build builds 
 Cloud Run sets `PORT` (8080). Buildpacks do not work here: the image they built had no server
 packages (`Cannot find package 'express'`) and ran Node 26.
 
-The trigger runs `cloudbuild.yaml`: build, push, migrate, deploy. The migrate step runs
-`server/dist/db/migrate.js` in the image just built, with `DATABASE_URL` from Secret Manager, so
-pending migrations reach the Neon `production` branch before the new revision; a failed
-migration ends the build and the previous revision keeps serving. The trigger was first created
+The trigger runs `cloudbuild.yaml`: build, push, migrate, deploy with no traffic, smoke, promote,
+update the cleanup job (see Releases). The migrate step runs `server/dist/db/migrate.js` in the
+image just built, with `DATABASE_URL` from Secret Manager, so pending migrations reach the Neon
+`production` branch before the new revision; a failed migration ends the build and the previous
+revision keeps serving. The trigger was first created
 by Cloud Run with an inline build; to point it at the file, in Cloud Build, Triggers, edit the
 trigger and set Configuration to "Cloud Build configuration file", location `cloudbuild.yaml`.
 The trigger's service account (the default compute account, also used by the Cloud Run service)
 already reads the `DATABASE_URL` secret.
+
+## Releases
+
+A deploy creates the new revision with no traffic and the tag `candidate`, at
+`https://candidate---depsie-kud34vyt4q-ew.a.run.app` (a tag's URL is `https://<tag>---<service
+host>`). The Smoke step runs `pnpm e2e` against it in the official Playwright image (its tag
+follows `@playwright/test`), and Promote moves all traffic to it with `update-traffic
+--to-tags=candidate=100`. A failed smoke test ends the build: Promote and the cleanup job update do
+not run, users keep the previous revision, and the build log names the failed test. The candidate
+uses the service's secrets, variables, database and scaling, and runs on its own instance. Since
+the first such deploy, traffic is pinned to a revision rather than following the latest, so only
+Promote or the commands below move it. A full build with smoke takes about 4 to 5 minutes.
+
+Migrations run before the candidate and stay applied when the smoke test fails. That is safe only
+under the forward-only rule (add first, remove in a later deploy), so the revision still serving
+keeps working with the new schema. A failed smoke leaves `master` ahead of what is live; fix it
+with a revert or a fix pull request, which deploys through the same gate.
+
+To turn a flag on (or change any variable), the same way by hand:
+
+```sh
+gcloud run services update depsie --region=europe-west1 \
+  --update-env-vars=FEATURE_<NAME>=on --no-traffic --tag=candidate
+gh workflow run smoke-live.yml -f url=https://candidate---depsie-kud34vyt4q-ew.a.run.app
+gcloud run services update-traffic depsie --region=europe-west1 --to-tags=candidate=100
+```
+
+Promote only after the "Smoke live" run passes (`gh run watch`).
+
+To roll back, with no rebuild: find the previous revision, then send all traffic to it.
+
+```sh
+gcloud run revisions list --service=depsie --region=europe-west1
+gcloud run services update-traffic depsie --region=europe-west1 --to-revisions=<previous>=100
+```
+
+Smoke runs are recorded as anonymous use: each writes 2 visits and 1 `React` report in `events`,
+with country `US`, plus its `ai_usage` rows. They can be about half of all reports. To leave them
+out of a count, drop `US` rows whose time falls inside a build's Smoke step (`gcloud builds list`
+for the times); country alone is not enough, since real visitors and "Smoke live" runs also come
+from the US.
+
+Merges that change only files outside the app do not build or deploy: the trigger's ignored files
+are `docs/**`, `openspec/**`, `.github/**`, `.claude/**`, `**/*.md` and `LICENSE`. Files that
+change the image or the smoke test (`e2e/**`, `playwright.config.ts`, `cloudbuild.yaml`, lock and
+config files) are not ignored, so every other merge runs the full deploy with its smoke test. Set
+2026-11-22 with a full update of the trigger (GET it, add `ignoredFiles`, PATCH it back with no
+`updateMask`): this trigger rejects every masked update with `INVALID_ARGUMENT`, which is what
+`gcloud builds triggers update github --ignored-files` sends.
+
+`gcloud builds submit` (to try `cloudbuild.yaml` by hand) needs the compute account to read the
+uploaded source: it has `roles/storage.objectViewer` on the `<project id>_cloudbuild` bucket.
 
 | Setting           | Value                                                                                                                                                                                                                        |
 | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -100,7 +153,7 @@ Sign-in works only on the URL in `BETTER_AUTH_URL` and the production OAuth app'
 works, but sign-in fails Better Auth's origin check, so use `depsie.cloud.run` to sign in.
 
 To try sign-in on the live URL before it opens to everyone, set `FEATURE_ACCOUNTS=<your login>` on
-the service and open `/signin`; no sign-in button is shown to anyone else. Set it back to `off` (or empty)
+the service (as in Releases) and open `/signin`; no sign-in button is shown to anyone else. Set it back to `off` (or empty)
 afterwards.
 
 ## Sources
@@ -109,6 +162,7 @@ afterwards.
 - [Cloud Run billing settings](https://docs.cloud.google.com/run/docs/configuring/billing-settings)
 - [Cloud Run container runtime contract](https://docs.cloud.google.com/run/docs/container-contract)
 - [Cloud Run request timeout](https://docs.cloud.google.com/run/docs/configuring/request-timeout)
+- [Cloud Run rollouts, rollbacks and traffic migration](https://docs.cloud.google.com/run/docs/rollouts-rollbacks-traffic-migration)
 - [Cloud Run continuous deployment](https://docs.cloud.google.com/run/docs/continuous-deployment)
 - [Cloud Run release notes (build script runs by default)](https://docs.cloud.google.com/run/docs/release-notes?hl=en)
 - [Express trust proxy on Cloud Run (community pull request)](https://github.com/Menshawy97/FORJD/pull/192)

@@ -2,7 +2,7 @@
 
 The MVP (`plan-mvp.md`) built a public, anonymous tool. This plan makes Depsie a product for
 signed-in developers: product requirements, accounts, saved reports with links, history and
-refresh, and observability. The agents plan (`plan-agents.md`) builds on
+refresh, a smoke test before each release, and observability. The agents plan (`plan-agents.md`) builds on
 it.
 
 Rules:
@@ -14,7 +14,7 @@ Rules:
 - The `events` analytics table stays anonymous: never linked to users or reports. Per-user numbers
   come from the account tables.
 - Existing functionality keeps working after every part: all existing tests and the smoke test
-  pass, in CI and against the live URL after the deploy. A test changes only when the behavior
+  pass, in CI and against the new revision before it gets traffic. A test changes only when the behavior
   change is intended, and the commit says why.
 - A new feature stays hidden behind a feature flag until it gives the user value on its own (for
   example, signing in shows nothing until saved reports and history exist). Turning a flag on is
@@ -159,7 +159,7 @@ Cloud Build expands `$_A/$B` to the first variable only, so substitutions need b
 - [x] Table `ai_usage` (user_id, source, model, tokens, cost, day): every AI
       call writes one row, including chat turns that change nothing; `user_id` is empty for
       anonymous use. The cost caps and the usage page read only this table
-- [x] Limits, as constants in one place, tuned later from the usage page (Part 7):
+- [x] Limits, as constants in one place, tuned later from the usage page (Part 8):
   - Signed-in: 10 reports per hour per user instead of per IP (refresh counts), and a daily AI
     cost cap of $0.25 per user
   - Anonymous: 10 reports per hour per IP, as today, and a shared daily AI cost cap of $1 for all
@@ -290,7 +290,70 @@ package, fact, pro and con on screen and each source's fetch date. Deleting from
 returned to `/reports` without it, and the report and its link returned 404. The two runs wrote
 four `ai_usage` rows ($0.0043). `accounts` was set back to `off`.
 
-## Part 7: Observability and usage
+## Part 7: Smoke test before release
+
+Today the deploy sends all traffic to the new revision at once, and "Smoke live" runs only after
+that, by hand, when users can already reach it. CI cannot catch what exists only in production
+(real npm and OpenRouter answers, Cloud Run settings, secrets, the production database). Here the
+new revision is smoke-tested first and gets traffic only if it passes.
+
+- [ ] Check first and record the answers here: how Cloud Run serves a revision deployed with
+      `--no-traffic --tag` (its URL, and that it reads the same secrets and database), whether a
+      Cloud Build step can run Playwright (the official Playwright image, or GitHub Actions called
+      from Cloud Build), how long the extra steps add to a deploy, and what the smoke run costs
+      (one real report, about $0.002 per deploy)
+
+  Answers (2026-11-22):
+  - Tag URL: `https://<tag>---<service host>` ([Cloud Run rollouts](https://docs.cloud.google.com/run/docs/rollouts-rollbacks-traffic-migration)),
+    so the candidate is `https://candidate---depsie-kud34vyt4q-ew.a.run.app`, as in design.md.
+  - Settings: `gcloud run services describe depsie` shows secrets (`OPENROUTER_API_KEY`,
+    `DATABASE_URL`, `GITHUB_*`, `BETTER_AUTH_SECRET`), variables and `maxScale: 1` on the revision
+    template, which `services update --no-traffic` copies into the candidate.
+  - Scaling: a tagged revision outside the traffic split is started and does not count toward the
+    service-level maximum (20); the lower of revision and service maximum applies, so the
+    candidate gets its own one instance ([max instances](https://docs.cloud.google.com/run/docs/configuring/max-instances)).
+  - Build duration: the last 8 builds took 2:08 to 3:08. The default build timeout is 60 minutes,
+    not 10 ([config schema](https://docs.cloud.google.com/build/docs/build-config-file-schema));
+    builds already run with `timeout: 3600s`.
+  - One build at a time: no trigger setting for it (trigger and config docs cover only
+    `queueTtl` and approval); the risk stays as accepted in design.md.
+  - Smoke share: in the last 28 days `events` has 26 reports and 128 visits; the trigger ran 24
+    builds (21 succeeded), and 22 of the 37 `master` commits touched app files. So smoke reports
+    may be about half of all reports. Kept, and told apart when reading the data (user's
+    decision): a smoke run writes 2 visits and 1 `React` report with country `US` inside the
+    build's Smoke step; country alone is not enough (7 earlier `US` reports, mostly "Smoke live").
+  - Smoke step on its own (`gcloud builds submit`, Playwright image): against the live URL,
+    build `56276c8b` passed in 2:01 (tests 57s); against `https://example.com`, build `5f9a179c`
+    failed in 5:15 naming both tests in `e2e/smoke.spec.ts`. The image has Node 26 and no
+    Corepack (Corepack's npm package collides with the image's `yarn`), so the step installs the
+    pnpm version named in `packageManager` with npm. `gcloud builds submit` needed
+    `roles/storage.objectViewer` for the compute service account on the `_cloudbuild` bucket.
+
+- [ ] `cloudbuild.yaml`: Deploy creates the new revision with no traffic and the tag `candidate`;
+      a new Smoke step runs `pnpm e2e` with `BASE_URL` set to the candidate URL; a new Promote step
+      moves all traffic to it only after Smoke passes. A failed smoke ends the build, the previous
+      revision keeps serving, and the build log names the failed test. Update cleanup job runs
+      after Promote, so the job never runs code that did not pass
+- [ ] Migrations still run before the candidate, so they must keep working with the revision still
+      serving (the existing rule: add first, remove in a later deploy). Record that a failed smoke
+      leaves the migration applied, and that this is safe only under that rule
+- [ ] Turning a flag on goes the same way: a new revision with the changed variable, no traffic,
+      smoke-tested at its tag, then promoted. Write the commands in `docs/hosting.md`
+- [ ] The smoke run's report and visit are recorded like any other anonymous use (analytics and
+      `ai_usage`); check that this is acceptable or exclude them in code, with evidence either way
+- [ ] Rollback by hand: the command that sends all traffic back to the previous revision, in
+      `docs/hosting.md`, tried once on the live service
+- [ ] Update the "Smoke live" workflow and the workflow rules in `AGENTS.md`: the deploy now runs
+      the smoke test itself; the manual workflow stays for checking the live URL at any time
+
+Tests: a deploy whose smoke test fails (for example a candidate built to fail one assertion, on a
+test service or by hand) leaves all traffic on the previous revision; a passing deploy moves all
+traffic to the new one.
+
+Success criteria: a merged pull request reaches users only after the smoke test passed against its
+own revision, and a failing one never does; rolling back by hand takes one command.
+
+## Part 8: Observability and usage
 
 - [ ] Structured logs with a request id across all paths
 - [ ] OpenTelemetry traces exported to Cloud Trace: one span per pipeline stage, external call and
@@ -313,3 +376,9 @@ Not planned; recorded so the design does not block it.
 - Package policy, to consider together with teams: rules a team sets for acceptable packages
   (allowed licenses, blocked packages, maximum vulnerability severity), checked in code rather
   than by the model, and used by a pull request check (agents plan, Later)
+- Pull request previews and a merge queue, when a second regular developer joins: each pull
+  request deployed privately with a Neon copy of production and smoke-tested before merge, so a
+  failed smoke test never reaches `master` and blocks the others; a merge queue so concurrent
+  merges do not race for the `candidate` tag or force every open branch to re-run. Builds on
+  Part 7: the candidate, the smoke gate and the rollback stay as the last check against the real
+  database. Limits to solve then: Neon free plan branches, no secrets for pull requests from forks
