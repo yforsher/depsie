@@ -69,7 +69,8 @@ Against a deployment, with real data and one real report: `BASE_URL=https://... 
 is none and waits for its checks. It never merges.
 
 `pnpm release [number]` merges the pull request once every check passed (or picks up one merged on
-GitHub), then waits for the deploy and its smoke test and says whether the release is live.
+GitHub), then waits for the deploy and prints each step, the smoke test results and whether the
+release is live. It needs `gcloud` signed in to the project.
 
 ## License
 

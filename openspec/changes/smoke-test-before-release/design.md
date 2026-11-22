@@ -89,19 +89,22 @@ Alternative: document the commands only. Rejected: the user asked for a script, 
 
 Cloud Build already reports each build to GitHub as a check run from the `google-cloud-build` app
 on the `master` commit (seen on the current `master` head), so `scripts/release.mjs` watches the
-deploy through `gh`, with no Google Cloud access:
+deploy through `gh`, and reads its details with `gcloud`:
 
 1. Find the pull request of the current branch (or `pnpm release <number>`).
 2. Not merged yet: stop unless every check passed; then `gh pr merge --squash --delete-branch`.
    Already merged (for example with the GitHub button): skip to watching.
 3. Read the merge commit and wait for its `google-cloud-build` check run. None after a few
    minutes: report that no deploy started (only ignored files changed) and stop.
-4. Poll until it completes; print "live" on success, or "deploy failed, the previous version keeps
-   serving" with the check's details link (the build log names the failed step and test).
+4. Poll until it completes; print each build step with its status and time, the smoke test's
+   summary and failing tests, then "live" or "deploy failed" and the build link, so the developer
+   never leaves the terminal.
 5. Switch the local repository to `master` and pull.
 
-Merging stays a choice the developer makes by running it; `pnpm ship` never merges. Node and `gh`
-only, like `ship`.
+Merging stays a choice the developer makes by running it; `pnpm ship` never merges. The check run
+carries only step statuses and a log link (the builds log to Cloud Logging only), so the steps and
+the Playwright lines come from `gcloud builds describe` and `gcloud builds log`: `release` needs
+`gcloud` signed in to the project, unlike `ship`.
 
 ### Candidate URL
 
