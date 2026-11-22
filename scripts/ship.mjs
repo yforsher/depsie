@@ -12,13 +12,9 @@ const { values } = parseArgs({
 });
 if (!values.message) stop('Usage: pnpm ship -m "message" [-b branch-name]');
 
-const changes = read('git', ['status', '--short']);
+// Not read(): its trim would drop the leading space of the first " M" line.
+const changes = execFileSync('git', ['status', '--short'], { encoding: 'utf8' }).trimEnd();
 if (!changes) stop('Nothing to commit.');
-
-if (read('git', ['branch', '--show-current']) === 'master') {
-  const branch = values.branch ?? slug(values.message);
-  run('git', ['switch', '-c', branch]);
-}
 
 console.log(`Changes to commit:\n${changes}\n`);
 if (!(await confirm('Commit all of these? (y/N) '))) stop('Stopped, nothing committed.');
@@ -28,6 +24,11 @@ for (const script of ['lint', 'test']) {
   if (spawnSync(`pnpm ${script}`, { stdio: 'inherit', shell: true }).status !== 0) {
     stop(`pnpm ${script} failed, nothing committed.`);
   }
+}
+
+// Only now, so a stop above leaves the developer on the branch they started from.
+if (read('git', ['branch', '--show-current']) === 'master') {
+  run('git', ['switch', '-c', values.branch ?? slug(values.message)]);
 }
 
 run('git', ['add', '--all']);
@@ -73,10 +74,14 @@ function run(command, args) {
   execFileSync(command, args, { stdio: 'inherit' });
 }
 
+// With no input to read (an agent's shell, or `!` in Claude Code) the question never resolves, so
+// a closed input counts as "no". Pipe the answer instead: echo y | pnpm ship -m "...".
 async function confirm(question) {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await rl.question(question);
+  const closed = new Promise((resolve) => rl.once('close', () => resolve('')));
+  const answer = await Promise.race([rl.question(question), closed]);
   rl.close();
+  if (!answer) console.log('\nNo answer (no input).');
   return answer.trim().toLowerCase() === 'y';
 }
 

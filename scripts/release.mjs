@@ -4,6 +4,10 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 
+// The merge and the end of the script switch to master, which local changes can block after the
+// merge already happened.
+if (read('git', ['status', '--porcelain'])) stop('Commit or stash local changes first.');
+
 let pr = prView(process.argv[2]);
 const number = String(pr.number);
 if (pr.state === 'CLOSED') stop(`${pr.url} is closed without a merge.`);
