@@ -399,17 +399,36 @@ Check first, answers (2026-11-22):
   to the startup probe's success (it succeeds on its 2nd attempt). The `/api/me` request that
   started the 14:41 instance took 10.1 seconds.
 
-- [ ] Structured logs with a request id across all paths
-- [ ] OpenTelemetry traces exported to Cloud Trace: one span per pipeline stage, external call and
+- [x] Structured logs with a request id across all paths
+- [x] OpenTelemetry traces exported to Cloud Trace: one span per pipeline stage, external call and
       AI call, with tokens and cost as attributes. Check how spans are exported when Cloud Run
       allocates CPU only during requests (`docs/hosting.md`): spans sent after the response may be
       lost, so flush before the response ends or change the setting, with evidence either way
-- [ ] Usage page for the signed-in user: reports, tokens and cost per day, from `ai_usage` (not
+- [x] Usage page for the signed-in user: reports, tokens and cost per day, from `ai_usage` (not
       from `events`), with the daily cost cap from Part 4
 
 Tests: the request id appears in every log line of a report request.
 
 Success criteria: for any report id, the trace shows every stage with its time and cost.
+
+After the release (PR #29, merge `b951219`, build `89b9ba22`, 2026-11-22):
+
+- Deploy: all 7 steps passed in 5:01; Smoke passed 2 tests against `depsie-00052-jal`, which then
+  got all traffic.
+- Trace: the smoke report `7ce40dd4-2d51-4aca-bb6a-071bd871dc31` has trace
+  `5b944ee0a4a55235d9b6944d78344a0a`, 45 spans: the request span (30.9s, `report.id` set),
+  `query_expansion` (3.2s), `candidate_search` (1.1s), `package_data`, `comparison` (23.5s), 38
+  outside calls named for their hosts with their status, and both AI calls with model, provider,
+  tokens and cost ($0.00011 and $0.00158). The spans that ended after the response are there, so
+  export after the response works with CPU allocated. Cloud Trace showed 15 spans after a few
+  minutes and all 45 a few minutes later: allow for that delay before concluding spans are lost.
+- Logs: Cloud Logging read the JSON lines (severity on the entry, `trace` set) and grouped all six
+  lines of the smoke report under its trace. No `tracing:` error line was logged.
+- Cold start: "Starting new instance" to "Server listening" took 7.2s (5.1 to 5.3s before, one
+  sample), so the tracing packages add about 2 seconds; the startup probe still succeeded after
+  10.5s, as before.
+- Usage page: checked signed in on a local run (`pnpm dev`) after one report: "Today: $0.0024 of
+  $0.25" and one row (1 report, 11,433 tokens, $0.0024), matching the report's two AI calls.
 
 ## Later
 
