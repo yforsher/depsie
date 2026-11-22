@@ -31,7 +31,8 @@ if (pr.state === 'OPEN') {
 const sha = pr.mergeCommit.oid;
 console.log(`Merged as ${sha.slice(0, 7)}. Waiting for the deploy...`);
 const deploy = await watchDeploy(sha);
-if (!deploy) {
+// A merge of only ignored files gets a neutral check run ("Changed files did not match file filter").
+if (!deploy || deploy.conclusion === 'neutral') {
   console.log('No deploy started: only files the trigger ignores changed.');
 } else {
   printBuild(deploy.details_url.match(/builds\/([0-9a-f-]{36})/)[1]);
@@ -49,7 +50,7 @@ run('git', ['switch', 'master']);
 run('git', ['pull']);
 
 // The deploy is the google-cloud-build check run on the merge commit. If none appears within a
-// few minutes, the trigger skipped the commit.
+// few minutes, the trigger did not run.
 async function watchDeploy(commit) {
   for (let waited = 0; ; waited += 15) {
     const runs = JSON.parse(
