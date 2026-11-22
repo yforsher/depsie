@@ -26,10 +26,10 @@ Rules:
 
 Feature flags in this plan:
 
-| Flag           | Hides                                                                                      | Turned on                                                         |
-| -------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| `report-links` | saving anonymous reports and their links, and the matching privacy note                    | on since 2026-11-18 (after Part 5)                                |
-| `accounts`     | sign-in, saved reports of signed-in users, their share links, history, refresh, usage page | after Part 6, when a signed-in user has saved reports and history |
+| Flag           | Hides                                                                                      | Turned on                          |
+| -------------- | ------------------------------------------------------------------------------------------ | ---------------------------------- |
+| `report-links` | saving anonymous reports and their links, and the matching privacy note                    | on since 2026-11-18 (after Part 5) |
+| `accounts`     | sign-in, saved reports of signed-in users, their share links, history, refresh, usage page | on since 2026-11-22 (after Part 6) |
 
 ## Part 1: Product requirements
 
