@@ -297,7 +297,7 @@ that, by hand, when users can already reach it. CI cannot catch what exists only
 (real npm and OpenRouter answers, Cloud Run settings, secrets, the production database). Here the
 new revision is smoke-tested first and gets traffic only if it passes.
 
-- [ ] Check first and record the answers here: how Cloud Run serves a revision deployed with
+- [x] Check first and record the answers here: how Cloud Run serves a revision deployed with
       `--no-traffic --tag` (its URL, and that it reads the same secrets and database), whether a
       Cloud Build step can run Playwright (the official Playwright image, or GitHub Actions called
       from Cloud Build), how long the extra steps add to a deploy, and what the smoke run costs
@@ -332,21 +332,21 @@ new revision is smoke-tested first and gets traffic only if it passes.
     ran 2 tests in 50 seconds against the candidate, Promote gave `depsie-00038-sov` all traffic,
     and the service template and the cleanup job run the merge commit's image.
 
-- [ ] `cloudbuild.yaml`: Deploy creates the new revision with no traffic and the tag `candidate`;
+- [x] `cloudbuild.yaml`: Deploy creates the new revision with no traffic and the tag `candidate`;
       a new Smoke step runs `pnpm e2e` with `BASE_URL` set to the candidate URL; a new Promote step
       moves all traffic to it only after Smoke passes. A failed smoke ends the build, the previous
       revision keeps serving, and the build log names the failed test. Update cleanup job runs
       after Promote, so the job never runs code that did not pass
-- [ ] Migrations still run before the candidate, so they must keep working with the revision still
+- [x] Migrations still run before the candidate, so they must keep working with the revision still
       serving (the existing rule: add first, remove in a later deploy). Record that a failed smoke
       leaves the migration applied, and that this is safe only under that rule
-- [ ] Turning a flag on goes the same way: a new revision with the changed variable, no traffic,
+- [x] Turning a flag on goes the same way: a new revision with the changed variable, no traffic,
       smoke-tested at its tag, then promoted. Write the commands in `docs/hosting.md`
-- [ ] The smoke run's report and visit are recorded like any other anonymous use (analytics and
+- [x] The smoke run's report and visit are recorded like any other anonymous use (analytics and
       `ai_usage`); check that this is acceptable or exclude them in code, with evidence either way
-- [ ] Rollback by hand: the command that sends all traffic back to the previous revision, in
+- [x] Rollback by hand: the command that sends all traffic back to the previous revision, in
       `docs/hosting.md`, tried once on the live service
-- [ ] Update the "Smoke live" workflow and the workflow rules in `AGENTS.md`: the deploy now runs
+- [x] Update the "Smoke live" workflow and the workflow rules in `AGENTS.md`: the deploy now runs
       the smoke test itself; the manual workflow stays for checking the live URL at any time
 
 Tests: a deploy whose smoke test fails (for example a candidate built to fail one assertion, on a
