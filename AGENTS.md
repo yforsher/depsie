@@ -125,7 +125,8 @@ time.
 - `pnpm ship` takes changes to an open pull request with its CI results, and `pnpm release`
   merges it and reports the deploy and its smoke test. An AI agent uses these two commands instead
   of calling `git push`, `gh pr create`, `gh pr checks` or `gh pr merge` directly, and runs `ship`
-  only when the user asks to commit and push, and `release` only when the user decides to merge.
+  only when the user asks to commit and push (piping its confirmation: `echo y | pnpm ship -m
+...`), and `release` only when the user decides to merge.
   `gh` stays fine for reading (a pull request, its comments or a run's log).
 - Feature flags: a new feature stays hidden behind a flag (`FEATURE_<NAME>`, off in production)
   until it gives the user value on its own. Turning a flag on is the user's decision, recorded in

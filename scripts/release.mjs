@@ -33,7 +33,9 @@ if (!deploy) {
     `Live: the smoke test passed and the new revision gets all traffic.\n${deploy.details_url}`,
   );
 } else {
-  console.log(`Deploy failed, the previous version keeps serving.\n${deploy.details_url}`);
+  // A failure before Promote (usually Smoke) leaves users on the previous version; the log says
+  // which step failed.
+  console.log(`Deploy failed; see the build log for the failed step.\n${deploy.details_url}`);
   process.exitCode = 1;
 }
 

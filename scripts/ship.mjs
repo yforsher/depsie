@@ -4,6 +4,7 @@
 // Usage: pnpm ship -m "message" [-b branch-name]
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 
 const { values } = parseArgs({
@@ -33,15 +34,28 @@ run('git', ['add', '--all']);
 run('git', ['commit', '-m', values.message]);
 run('git', ['push', '--set-upstream', 'origin', 'HEAD']);
 
-// A push already updates an open pull request, so open one only when the branch has none.
-if (spawnSync('gh', ['pr', 'view'], { stdio: 'ignore' }).status !== 0) {
-  run('gh', ['pr', 'create', '--fill']);
-}
+// A push already updates an open pull request, so open one only when the branch has none open
+// (gh also finds a merged or closed one, and new commits there need a new pull request).
+if (prField('state') !== 'OPEN') run('gh', ['pr', 'create', '--fill']);
 
+// The pull request reaches the pushed commit and its checks a few seconds after the push; watching
+// before then ends at once with "no checks reported" or the previous commit's results.
+const head = read('git', ['rev-parse', 'HEAD']);
+while (prField('headRefOid') !== head || !prChecks()) await sleep(5_000);
 const passed = spawnSync('gh', ['pr', 'checks', '--watch'], { stdio: 'inherit' }).status === 0;
 const url = read('gh', ['pr', 'view', '--json', 'url', '--jq', '.url']);
 console.log(`\n${url}\n${passed ? 'All checks passed.' : 'Some checks failed.'}`);
 process.exitCode = passed ? 0 : 1;
+
+// Empty when the branch has no pull request.
+function prField(field) {
+  const args = ['pr', 'view', '--json', field, '--jq', `.${field}`];
+  return spawnSync('gh', args, { encoding: 'utf8' }).stdout.trim();
+}
+
+function prChecks() {
+  return spawnSync('gh', ['pr', 'checks', '--json', 'name'], { encoding: 'utf8' }).stdout.trim();
+}
 
 function slug(text) {
   return text

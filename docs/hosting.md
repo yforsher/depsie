@@ -32,15 +32,23 @@ uses the service's secrets, variables, database and scaling, and runs on its own
 the first such deploy, traffic is pinned to a revision rather than following the latest, so only
 Promote or the commands below move it. A full build with smoke takes about 4 to 5 minutes.
 
+Merge one pull request at a time and wait until its deploy ends (`pnpm release` reports it): the
+trigger cannot be limited to one build at a time, and two overlapping builds share the
+`candidate` tag, so one could promote the other's revision.
+
 Migrations run before the candidate and stay applied when the smoke test fails. That is safe only
 under the forward-only rule (add first, remove in a later deploy), so the revision still serving
 keeps working with the new schema. A failed smoke leaves `master` ahead of what is live; fix it
 with a revert or a fix pull request, which deploys through the same gate.
 
-To turn a flag on (or change any variable), the same way by hand:
+To turn a flag on (or change any variable), the same way by hand. Pass the serving revision's
+image: the service template keeps the image of the last deploy, which after a failed smoke test or
+a rollback is not the code users have.
 
 ```sh
-gcloud run services update depsie --region=europe-west1 \
+gcloud run services describe depsie --region=europe-west1 --format="value(status.traffic)"
+gcloud run revisions describe <serving revision> --region=europe-west1 --format="value(image)"
+gcloud run services update depsie --region=europe-west1 --image=<that image> \
   --update-env-vars=FEATURE_<NAME>=on --no-traffic --tag=candidate
 gh workflow run smoke-live.yml -f url=https://candidate---depsie-kud34vyt4q-ew.a.run.app
 gcloud run services update-traffic depsie --region=europe-west1 --to-tags=candidate=100
