@@ -19,11 +19,16 @@ if (!changes) stop('Nothing to commit.');
 console.log(`Changes to commit:\n${changes}\n`);
 if (!(await confirm('Commit all of these? (y/N) '))) stop('Stopped, nothing committed.');
 
-// pnpm is a .cmd file on Windows, so it needs a shell; these commands take no user input.
+// pnpm is a .cmd file on Windows, so it needs a shell; these commands take no user input. Their
+// output is shown only on failure, where it says what to fix.
 for (const script of ['lint', 'test']) {
-  if (spawnSync(`pnpm ${script}`, { stdio: 'inherit', shell: true }).status !== 0) {
-    stop(`pnpm ${script} failed, nothing committed.`);
-  }
+  const result = spawnSync(`pnpm ${script} 2>&1`, {
+    shell: true,
+    encoding: 'utf8',
+    maxBuffer: 50_000_000,
+  });
+  if (result.status !== 0) stop(`${result.stdout}\npnpm ${script} failed, nothing committed.`);
+  console.log(`pnpm ${script} passed.`);
 }
 
 // Only now, so a stop above leaves the developer on the branch they started from.
@@ -43,7 +48,11 @@ if (prField('state') !== 'OPEN') run('gh', ['pr', 'create', '--fill']);
 // before then ends at once with "no checks reported" or the previous commit's results.
 const head = read('git', ['rev-parse', 'HEAD']);
 while (prField('headRefOid') !== head || !prChecks()) await sleep(5_000);
-const passed = spawnSync('gh', ['pr', 'checks', '--watch'], { stdio: 'inherit' }).status === 0;
+// --watch reprints every check every 10 seconds, so its output is dropped and the final state
+// printed once.
+console.log('Waiting for the checks...');
+const passed = spawnSync('gh', ['pr', 'checks', '--watch'], { stdio: 'ignore' }).status === 0;
+spawnSync('gh', ['pr', 'checks'], { stdio: 'inherit' });
 const url = read('gh', ['pr', 'view', '--json', 'url', '--jq', '.url']);
 console.log(`\n${url}\n${passed ? 'All checks passed.' : 'Some checks failed.'}`);
 process.exitCode = passed ? 0 : 1;
