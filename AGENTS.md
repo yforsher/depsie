@@ -48,8 +48,13 @@ step limit and a cost cap enforced in code.
   Deleting an account deletes all its data.
   Package data is not cached.
 - Anonymous activity analytics: visits, report count, framework, success or error status,
-  time and country. AI tokens and cost are recorded only in `ai_usage` (per AI call, with the day
-  but not the time, and the saved report's id), so they cannot link a signed-in user to an `events` row. Unique visitors are counted per day with a
+  time and country. In the database, AI tokens and cost are kept only in `ai_usage` (per AI call,
+  with the day but not the time, and the saved report's id), so they cannot link a signed-in user
+  to an `events` row. The one exception is outside the database: the server's logs and traces
+  (Cloud Logging and Cloud Trace, operator-only, kept 30 days) hold report ids, exact times, tokens
+  and cost, which the operator could match by time to an `events` row; accepted by the user on
+  2026-11-22 and stated in the privacy note. They never hold the need text, dependency names, a
+  user id or an IP address. Unique visitors are counted per day with a
   hash of the IP and a random salt that is replaced daily and never stored, so visitors cannot be
   identified or followed across days. No IP addresses stored, and never the need text, dependency
   names or the report. The `events` table is never linked to users or reports; per-user numbers

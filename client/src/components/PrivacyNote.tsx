@@ -47,6 +47,11 @@ export function PrivacyNote() {
             is stored.
           </li>
           <li>
+            The server logs and traces, which only the operator can read, keep report ids, times,
+            tokens and cost for 30 days, to find slow or failed reports. They never hold the need,
+            the dependencies or who you are.
+          </li>
+          <li>
             Anonymous usage counts are stored: page visits and reports with the time, country,
             framework, and success or error status. Unique visitors are counted per day with a hash
             of the IP and a salt that changes daily and is never stored, so visitors cannot be

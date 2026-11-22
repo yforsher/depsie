@@ -1,7 +1,10 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { and, desc, eq, sql, sum } from 'drizzle-orm';
 import type { RequestHandler } from 'express';
+import type { UsageDay, UsageResponse } from 'shared';
 import { db } from './db/client.js';
 import { aiUsage } from './db/schema.js';
+import { USER_DAILY_COST, utcToday } from './limits.js';
 import { log } from './log.js';
 import type { User } from './users.js';
 
@@ -47,5 +50,25 @@ export function recordAiUsage(
       completion_tokens: completionTokens,
       cost,
     })
-    .catch((error: Error) => log(`ai usage write failed: ${error.message}`));
+    .catch((error: Error) => log(`ai usage write failed: ${error.message}`, 'ERROR'));
+}
+
+// A signed-in user's usage per UTC day over the last 30 days, from ai_usage only. Every report and
+// refresh makes exactly one query_expansion call, so those rows count the reports run.
+export async function usageOf(userId: string): Promise<UsageResponse> {
+  const days: UsageDay[] = await db()
+    .select({
+      day: aiUsage.day,
+      reports: sql`count(*) filter (where ${aiUsage.source} = 'query_expansion')`.mapWith(Number),
+      tokens: sql`sum(${aiUsage.prompt_tokens} + ${aiUsage.completion_tokens})`.mapWith(Number),
+      cost: sum(aiUsage.cost).mapWith(Number),
+    })
+    .from(aiUsage)
+    .where(
+      and(eq(aiUsage.user_id, userId), sql`${aiUsage.day} > (now() at time zone 'utc')::date - 30`),
+    )
+    .groupBy(aiUsage.day)
+    .orderBy(desc(aiUsage.day));
+  const todayCost = days.find((d) => d.day === utcToday())?.cost ?? 0;
+  return { days, todayCost, dailyCap: USER_DAILY_COST };
 }

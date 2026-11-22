@@ -27,6 +27,8 @@ steps:
       - --image=$_IMAGE
       - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
       - --region=$_DEPLOY_REGION
+      # The project of the trace export and of the log lines' trace field.
+      - --update-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID
       - --no-traffic
       - --tag=candidate
       - --quiet

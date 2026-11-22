@@ -285,6 +285,76 @@ describe('limits for signed-in users', () => {
   });
 });
 
+describe('GET /api/usage', () => {
+  // The UTC day `daysAgo` days before today, as ai_usage stores it.
+  const utcDay = (daysAgo: number) =>
+    new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  async function call(userId: string | null, source: string, daysAgo: number, cost: number) {
+    await db().execute(
+      sql`insert into ai_usage (user_id, source, model, prompt_tokens, completion_tokens, cost, day)
+          values (${userId}, ${source}, 'm', 100, 50, ${cost}, ${utcDay(daysAgo)})`,
+    );
+  }
+
+  it("returns the user's reports, tokens and cost per day, newest first, with today's cost and the cap", async () => {
+    const alice = await signedInUser('alice');
+    const bob = await signedInUser('bob');
+    // Today one report, yesterday two (each a query expansion and a comparison).
+    await call(alice.id, 'query_expansion', 0, 0.001);
+    await call(alice.id, 'comparison', 0, 0.002);
+    for (let i = 0; i < 2; i++) {
+      await call(alice.id, 'query_expansion', 1, 0.001);
+      await call(alice.id, 'comparison', 1, 0.002);
+    }
+    // Not counted: another user, anonymous use, and a day older than 30 days.
+    await call(bob.id, 'query_expansion', 0, 0.1);
+    await call(null, 'query_expansion', 0, 0.1);
+    await call(alice.id, 'query_expansion', 30, 0.1);
+
+    const response = await request(createApp(clientDir))
+      .get('/api/usage')
+      .set('Cookie', alice.cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      days: [
+        { day: utcDay(0), reports: 1, tokens: 300, cost: 0.003 },
+        { day: utcDay(1), reports: 2, tokens: 600, cost: 0.006 },
+      ],
+      todayCost: 0.003,
+      dailyCap: 0.25,
+    });
+  });
+
+  it('returns no days and nothing spent today for a user without usage', async () => {
+    const alice = await signedInUser('alice');
+    const response = await request(createApp(clientDir))
+      .get('/api/usage')
+      .set('Cookie', alice.cookie);
+
+    expect(response.body).toEqual({ days: [], todayCost: 0, dailyCap: 0.25 });
+  });
+
+  it('is 401 without a session', async () => {
+    expect((await request(createApp(clientDir)).get('/api/usage')).status).toBe(401);
+  });
+
+  it('is 404 while accounts is off, or not on for the caller', async () => {
+    const alice = await signedInUser('alice');
+    vi.stubEnv('FEATURE_ACCOUNTS', 'bob');
+    const listed = await request(createApp(clientDir))
+      .get('/api/usage')
+      .set('Cookie', alice.cookie);
+    vi.stubEnv('FEATURE_ACCOUNTS', '');
+    const off = await request(createApp(clientDir)).get('/api/usage').set('Cookie', alice.cookie);
+    vi.stubEnv('FEATURE_ACCOUNTS', 'on');
+
+    expect(listed.status).toBe(404);
+    expect(off.status).toBe(404);
+  });
+});
+
 describe('the accounts flag', () => {
   afterEach(() => {
     vi.stubEnv('FEATURE_ACCOUNTS', 'on');

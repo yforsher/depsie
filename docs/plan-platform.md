@@ -358,6 +358,47 @@ own revision, and a failing one never does; rolling back by hand takes one comma
 
 ## Part 8: Observability and usage
 
+Check first, answers (2026-11-22):
+
+- CPU outside requests: `gcloud run services describe depsie` shows
+  `run.googleapis.com/cpu-throttling: 'false'` on the template of `depsie-00050-bab`, so CPU stays
+  allocated after a response and spans can be exported in the background.
+- Packages: the Cloud Trace exporter is legacy; Google's migration guide
+  ([MIGRATION.md](https://github.com/GoogleCloudPlatform/opentelemetry-operations-js/blob/main/MIGRATION.md))
+  uses `@opentelemetry/exporter-trace-otlp-proto` sent to `https://telemetry.googleapis.com`,
+  with an async `headers()` from `google-auth-library` (tokens expire after an hour). npm today:
+  `@opentelemetry/sdk-trace-base` and `sdk-trace-node` are deprecated ("Use
+  @opentelemetry/sdk-trace package"); the current set is `@opentelemetry/api` 1.10.0,
+  `@opentelemetry/sdk-trace` 3.1.1 (`TracerProvider`, `BatchSpanProcessor`,
+  `InMemorySpanExporter`), `@opentelemetry/context-async-hooks` 3.1.1,
+  `@opentelemetry/resources` 3.1.1, `@opentelemetry/exporter-trace-otlp-proto` 0.301.2 (built on
+  `sdk-trace` 3.1.1) and `google-auth-library` 11.3.4.
+- `gcp.project_id`: required; export without it fails with "Resource is missing gcp.project_id
+  resource attribute" ([OTLP overview](https://docs.cloud.google.com/stackdriver/docs/otlp/overview)).
+  `@opentelemetry/resource-detector-gcp` 0.60.0 does not set it (its `GcpDetector` sets only
+  `cloud.account.id`), so the server sets `gcp.project_id` from `GOOGLE_CLOUD_PROJECT` and
+  `service.name` from `K_SERVICE`, without the detector.
+- API and role: `telemetry.googleapis.com` is already enabled (`gcloud services list --enabled`).
+  The writer role is `roles/telemetry.tracesWriter` (permission `telemetry.traces.write`,
+  [Telemetry roles](https://docs.cloud.google.com/iam/docs/roles-permissions/telemetry)). The
+  service account `110575815864-compute@developer.gserviceaccount.com` has
+  `artifactregistry.writer`, `iam.serviceAccountUser`, `logging.logWriter`, `run.admin` and
+  `secretmanager.secretAccessor`, so the role still had to be granted; granted on 2026-11-22 with
+  the user's approval (`gcloud projects get-iam-policy` now lists `roles/telemetry.tracesWriter`).
+- Log fields: Cloud Run moves the special keys of a JSON line on stdout into the log entry
+  ([structured logging](https://docs.cloud.google.com/logging/docs/structured-logging)):
+  `severity`, `message`, `logging.googleapis.com/trace` as `projects/<project>/traces/<trace id>`
+  ([Cloud Run sample](https://docs.cloud.google.com/run/docs/samples/cloudrun-manual-logging)),
+  `logging.googleapis.com/spanId` and `logging.googleapis.com/trace_sampled`. The page itself
+  could not be fetched here (WebFetch not allowed), so the grouping is checked on the first deploy.
+- Search by attribute: Trace Explorer's filter bar has "Add attribute filter" with a custom key
+  and value ([Find and explore traces](https://docs.cloud.google.com/trace/docs/finding-traces)),
+  so a report is found with key `report.id` and its id.
+- Cold start before this part (four new instances on 2026-11-22, system and stdout logs): about
+  5.1 to 5.3 seconds from "Starting new instance" to "Server listening", and 10.3 to 10.7 seconds
+  to the startup probe's success (it succeeds on its 2nd attempt). The `/api/me` request that
+  started the 14:41 instance took 10.1 seconds.
+
 - [ ] Structured logs with a request id across all paths
 - [ ] OpenTelemetry traces exported to Cloud Trace: one span per pipeline stage, external call and
       AI call, with tokens and cost as attributes. Check how spans are exported when Cloud Run

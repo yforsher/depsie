@@ -33,6 +33,12 @@ A JavaScript or TypeScript developer choosing an npm package for a need in their
   earlier from the link. It is read-only: no chat, no refresh, no new versions.
 - Reports of signed-in users are private. The user can delete them earlier, and deleting the
   account deletes them. The owner can create a read-only share link and revoke it.
+- AI tokens and cost are kept in the database only in `ai_usage`, never in the anonymous
+  `events` table. The server's logs and traces, which only the operator can read and Google Cloud
+  keeps 30 days, hold report ids, exact times, tokens and cost, so a slow or expensive report can
+  be followed stage by stage (user's decision, 2026-11-22); the privacy note says so.
+- Signed-in users see their own usage (reports, tokens and cost per day, and today's spend
+  against the daily cap) on a usage page.
 - No teams and no package policy; see Later in `plan-platform.md`.
 
 ## Plan parts by use case

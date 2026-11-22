@@ -17,6 +17,7 @@ import { ReportsPage } from './components/ReportsPage.tsx';
 import { SavedReportPage } from './components/SavedReportPage.tsx';
 import { SharedReportPage } from './components/SharedReportPage.tsx';
 import { SignInPage } from './components/SignInPage.tsx';
+import { UsagePage } from './components/UsagePage.tsx';
 import { useFeaturesSettled, useSignIn } from './features.ts';
 
 // Every page shares the top bar: the Depsie logo, which leads home, and the account control.
@@ -85,6 +86,20 @@ const reportsRoute = createRoute({
   },
 });
 
+// The signed-in user's AI usage. Anyone else is redirected as from /account.
+const usageRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/usage',
+  component: function Usage() {
+    const settled = useFeaturesSettled();
+    const signIn = useSignIn();
+    const me = useMe();
+    if (!settled || me.isLoading) return null;
+    if (me.data) return <UsagePage />;
+    return <Navigate to={signIn ? '/signin' : '/'} replace />;
+  },
+});
+
 // A signed-in user's saved report. Anyone else is redirected as from /account.
 const savedReportRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -121,6 +136,7 @@ const routeTree = rootRoute.addChildren([
   signInRoute,
   accountRoute,
   reportsRoute,
+  usageRoute,
   savedReportRoute,
   sharedReportRoute,
 ]);

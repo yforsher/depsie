@@ -734,6 +734,31 @@ summary {
   font-size: 1.125rem;
 }
 
+/* Usage page: one row per day, numbers aligned right. */
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-table th,
+.usage-table td {
+  padding: 8px 0 8px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+
+.usage-table th {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.usage-table th:first-child,
+.usage-table td:first-child {
+  padding-left: 0;
+  text-align: left;
+}
+
 .github-button {
   display: inline-flex;
   align-items: center;

@@ -7,6 +7,7 @@ import type {
   ReportSummary,
   SavedReport,
   SharedReport,
+  UsageResponse,
 } from 'shared';
 
 async function serverError(res: Response): Promise<string> {
@@ -73,6 +74,13 @@ export async function fetchSharedReport(shareId: string): Promise<SharedReport |
 export async function deleteSharedReport(shareId: string): Promise<void> {
   const res = await fetch(`/api/s/${shareId}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('The report could not be deleted. It may already be gone.');
+}
+
+// The signed-in user's AI usage per day over the last 30 days, and today's spend against the cap.
+export async function fetchUsage(): Promise<UsageResponse> {
+  const res = await fetch('/api/usage');
+  if (!res.ok) throw new Error(`Your usage could not be loaded (status ${res.status}).`);
+  return res.json() as Promise<UsageResponse>;
 }
 
 // The signed-in user's saved reports, most recently updated first.

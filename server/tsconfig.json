@@ -12,6 +12,7 @@
     "src/fixtures.ts",
     "src/fixtureResponses.ts",
     "src/e2e.ts",
-    "src/testUsers.ts"
+    "src/testUsers.ts",
+    "src/testSpans.ts"
   ]
 }
