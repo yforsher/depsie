@@ -108,12 +108,12 @@ describe('privacy note', () => {
     return screen.getByRole('dialog', { name: 'How your data is handled' });
   }
 
-  it('says what is stored for the daily cost limits', async () => {
+  it('says what is stored for the daily limits', async () => {
     stubServer({ enabled: [], signIn: false }, null);
     renderAt('/');
 
     expect(await openNote()).toHaveTextContent(
-      'The tokens and cost of each AI call are stored with its day (not the time) to enforce daily cost limits',
+      'The tokens and cost of each AI call are stored with its day (not the time) to enforce the daily limits and to know what the service costs',
     );
   });
 

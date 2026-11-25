@@ -266,6 +266,31 @@ describe('POST /api/report', () => {
     expect(response.body.error).toMatch(/limit is 10 per hour/);
   });
 
+  describe('per IP per day', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('refuses an IP its 11th anonymous report within 24 hours, with no AI call, while another IP gets one', async () => {
+      const fetchMock = mockPipeline();
+      // Only Date is faked, so the database and the requests keep their real timers.
+      vi.useFakeTimers({ toFake: ['Date'] });
+      const app = createApp(clientDir);
+      const from = (ip: string) => request(app).post('/api/report').set('X-Forwarded-For', ip);
+      for (let i = 0; i < 10; i++) {
+        expect((await from('203.0.113.1').send({})).status).toBe(400);
+      }
+      // Past the hourly window, so only the daily limit can answer.
+      vi.setSystemTime(Date.now() + 61 * 60 * 1000);
+
+      const refused = await from('203.0.113.1').send(reportBody);
+      expect(refused.status).toBe(429);
+      expect(refused.body.error).toMatch(/limit is 10 per day/);
+      expect(aiCalls(fetchMock)).toBe(0);
+      expect((await from('203.0.113.2').send(reportBody)).status).toBe(200);
+    });
+  });
+
   // The proxy appends the client IP to X-Forwarded-For; anything before it came from the client.
   it('limits by the last X-Forwarded-For address, so a client cannot fake its IP', async () => {
     mockPipeline();
@@ -564,18 +589,21 @@ describe('AI usage', () => {
   });
 });
 
-describe('daily cost cap', () => {
-  async function spend(cost: number, day = "(now() at time zone 'utc')::date") {
+describe('daily report cap', () => {
+  const today = "(now() at time zone 'utc')::date";
+
+  // `count` anonymous AI calls of one step on `day`, each costing `cost`.
+  async function calls(count: number, source: string, cost = 0.001, day = today) {
     await db.client!.query(
       `insert into ai_usage (user_id, source, model, prompt_tokens, completion_tokens, cost, day)
-       values (null, 'comparison', 'm', 1, 1, $1, ${day})`,
-      [cost],
+       select null, $1, 'm', 1, 1, $2, ${day} from generate_series(1, $3)`,
+      [source, cost, count],
     );
   }
 
-  it('refuses an anonymous report once anonymous use has spent $1 today, with no AI call', async () => {
+  it('refuses an anonymous report once anonymous use has run 400 reports today, with no AI call', async () => {
     const fetchMock = mockPipeline();
-    await spend(1);
+    await calls(400, 'query_expansion');
     const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
 
     expect(response.status).toBe(429);
@@ -583,10 +611,46 @@ describe('daily cost cap', () => {
     expect(aiCalls(fetchMock)).toBe(0);
   });
 
+  it('allows the 400th anonymous report of the day', async () => {
+    mockPipeline();
+    await calls(399, 'query_expansion');
+    const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    expect(response.status).toBe(200);
+  });
+
+  it('does not limit by cost, and counts only query expansion calls as reports', async () => {
+    mockPipeline();
+    await calls(1, 'query_expansion', 5);
+    await calls(400, 'comparison', 5);
+    const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    expect(response.status).toBe(200);
+  });
+
   it('does not count earlier days', async () => {
     mockPipeline();
-    await spend(5, "(now() at time zone 'utc')::date - 1");
+    await calls(400, 'query_expansion', 0.001, `${today} - 1`);
     const response = await request(createApp(clientDir)).post('/api/report').send(reportBody);
+
+    expect(response.status).toBe(200);
+  });
+
+  it('does not count reports refused by the daily cap toward the per-IP daily limit', async () => {
+    mockPipeline();
+    // Only Date is faked, so the database and the requests keep their real timers.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const app = createApp(clientDir);
+    const from = () => request(app).post('/api/report').set('X-Forwarded-For', '203.0.113.1');
+    await calls(400, 'query_expansion');
+    for (let i = 0; i < 10; i++) {
+      expect((await from().send(reportBody)).status).toBe(429);
+    }
+    // The shared cap frees up (as at midnight), and the hourly window has passed.
+    await db.client!.query('delete from ai_usage');
+    vi.setSystemTime(Date.now() + 61 * 60 * 1000);
+    const response = await from().send(reportBody);
+    vi.useRealTimers();
 
     expect(response.status).toBe(200);
   });

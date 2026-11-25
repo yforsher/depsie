@@ -183,7 +183,7 @@ has one callback URL:
 The local app's ID and secret go in `.env`; the production app's in Secret Manager as
 `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`, with a new random `BETTER_AUTH_SECRET` (at least
 32 characters; changing it signs everyone out). `BETTER_AUTH_URL` is the origin the browser uses:
-the live URL in production, the Vite dev server locally. As a backstop to the daily cost caps in
+the live URL in production, the Vite dev server locally. As a backstop to the daily report caps in
 `server/src/limits.ts`, the OpenRouter account holds a small prepaid balance with auto top-up off
 (a credit limit on the key would do the same).
 

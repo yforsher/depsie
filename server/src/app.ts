@@ -20,7 +20,7 @@ import { recordVisit, reportAnalytics, setFramework } from './analytics.js';
 import { createAuth } from './auth.js';
 import { NpmError } from './candidates.js';
 import { enabledFor, isOn, readFlags } from './features.js';
-import { checkCostCap, REPORTS_PER_HOUR } from './limits.js';
+import { ANONYMOUS_REPORTS_PER_IP_PER_DAY, checkDailyCap, REPORTS_PER_HOUR } from './limits.js';
 import { log } from './log.js';
 import { AiError } from './openrouter.js';
 import { generateReport } from './report.js';
@@ -87,6 +87,23 @@ export function createApp(clientDir: string) {
     message: { error: `Too many reports: the limit is ${REPORTS_PER_HOUR} per hour.` },
     handler: (_req, res, _next, options) => {
       log('rate limited');
+      res.status(options.statusCode).json(options.message);
+    },
+  });
+
+  // Anonymous reports only (a refresh needs a session); each IP's window starts at its first one.
+  const anonymousDailyLimiter = rateLimit({
+    windowMs: 24 * 60 * 60 * 1000,
+    limit: ANONYMOUS_REPORTS_PER_IP_PER_DAY,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    skip: (_req, res) => res.locals.user !== undefined,
+    keyGenerator: (req) => ipKeyGenerator(req.ip ?? ''),
+    message: {
+      error: `Too many reports: the limit is ${ANONYMOUS_REPORTS_PER_IP_PER_DAY} per day without signing in.`,
+    },
+    handler: (_req, res, _next, options) => {
+      log('rate limited per day');
       res.status(options.statusCode).json(options.message);
     },
   });
@@ -181,7 +198,7 @@ export function createApp(clientDir: string) {
       ownReportInputs,
       usageUser,
       reportLimiter,
-      checkCostCap,
+      checkDailyCap,
       async (req: Request<{ id: string }>, res: Response) => {
         const user = res.locals.user as User;
         const inputs = res.locals.inputs as ReportRequest;
@@ -250,7 +267,9 @@ export function createApp(clientDir: string) {
     ...withUser,
     usageUser,
     reportLimiter,
-    checkCostCap,
+    // After the daily cap, so reports it refuses do not use up the IP's daily ones.
+    checkDailyCap,
+    anonymousDailyLimiter,
     express.json(),
     async (req, res) => {
       const parsed = reportRequestSchema.safeParse(req.body);

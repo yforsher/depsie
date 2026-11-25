@@ -25,7 +25,7 @@ the structured report in the browser, with no AI call and no server request.
 `POST /api/report` with `{ need, framework, dependencies? }` returns `{ report, saved }` (types in
 `shared/`; `saved` is null when the report was not saved),
 `POST`/`DELETE /api/reports/:id/share` (create or revoke a link), `GET /api/reports` (the user's
-reports), `GET /api/usage` (the user's AI usage per day and today's spend against the cap), `GET /api/reports/:id?version=N` (the owner's report, latest or version N),
+reports), `GET /api/usage` (the user's reports and tokens per day and today's reports against the daily cap), `GET /api/reports/:id?version=N` (the owner's report, latest or version N),
 `DELETE /api/reports/:id`, `POST /api/reports/:id/refresh` (a new version, with the same errors
 as a new report), `GET`/`DELETE /api/s/:shareId` (a shared report, delete by link),
 and `GET /api/features` for the flags on for this visitor and `signIn` (sign-in exists, so
@@ -117,9 +117,9 @@ label or icon, never color alone.
   a signed-in owner (`saved.owned`) also Revoke link, and on `/` a link to the saved report.
 - `src/components/ReportsPage.tsx`: the user's reports, most recently updated first: need (a link
   to the report), framework, date, version count and Shared, with Delete; an empty list says so.
-- `src/components/UsagePage.tsx`: "Today: $x of $0.25" (dollars with up to four decimals, since a
-  report costs about $0.002), then one table row per UTC day of the last 30 days with usage, newest
-  first: date, reports, tokens and cost; with no usage it says so.
+- `src/components/UsagePage.tsx`: "Today: N of 10 reports", then one table row per UTC day of the
+  last 30 days with usage, newest first: date, reports and tokens; with no usage it says so. No
+  dollar amount anywhere: the user does not pay for the AI calls.
 - `src/components/DeleteButton.tsx`: Delete, then Delete permanently or Cancel; used by the reports
   list and the report page.
 - `src/components/SavedReportPage.tsx`: the owner's report, latest version or the one in

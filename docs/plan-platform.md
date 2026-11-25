@@ -430,6 +430,39 @@ After the release (PR #29, merge `b951219`, build `89b9ba22`, 2026-11-22):
 - Usage page: checked signed in on a local run (`pnpm dev`) after one report: "Today: $0.0024 of
   $0.25" and one row (1 report, 11,433 tokens, $0.0024), matching the report's two AI calls.
 
+## Part 9: Daily caps in reports instead of dollars
+
+The daily caps are in dollars ($0.25 per signed-in user, $1 shared by all anonymous use), so the
+usage page shows users what their reports cost the operator, which reads like a bill on a free
+tool. A report costs about $0.0023 (`openai/gpt-6-luna`), so counting reports keeps the same cost
+bound and is what users understand.
+
+- [ ] Replace the dollar caps in `server/src/limits.ts` with report counts: 10 reports per UTC day
+      per signed-in user, 400 per UTC day shared by all anonymous use (about $1). Remove
+      `USER_DAILY_COST` and the anonymous dollar cap; no dollar limit remains
+- [ ] Count today's reports from `ai_usage` rows with source `query_expansion` (one per report
+      and per refresh, written even when the report then fails), so a refresh counts as a report
+      and the check still runs before any AI call; 429 with a message naming the daily limit, 503
+      without the database, as today
+- [ ] Keep the hourly limits as they are (10 per hour per signed-in user, else per IP)
+- [ ] Limit anonymous reports to 10 per IP per 24 hours, in server memory next to the hourly limit
+      (no IP stored), so one visitor cannot use up the shared 400; signed-in users are not counted
+      by IP
+- [ ] Usage page: "Today: N of 10 reports" instead of dollars, and the table without the cost
+      column (day, reports, tokens). `GET /api/usage` returns `todayReports` and `dailyCap` (a
+      report count) instead of `todayCost`; tokens and cost stay recorded in `ai_usage`
+- [ ] Update the `usage-limits` spec, `server/AGENTS.md`, `client/AGENTS.md` and
+      `docs/product.md` where they name the dollar caps
+
+Tests: a signed-in user's 11th report of the UTC day gets 429 and no AI call, also after a failed
+report or a refresh; the 401st anonymous report of the day gets 429 while a signed-in user under
+their cap still gets reports; an IP's 11th anonymous report within 24 hours gets 429 while a
+signed-in user on that IP still gets reports; the caps count from zero on a new UTC day; the usage page shows
+"Today: 1 of 10 reports" after one report and no dollar amount.
+
+Success criteria: no dollar amount is checked by a limit or shown to a user, the caps hold in
+reports, and all existing tests and the smoke test pass.
+
 ## Later
 
 Not planned; recorded so the design does not block it.

@@ -24,7 +24,7 @@ cp .env.example .env   # then fill in the keys
 pnpm dev
 ```
 
-Reports need a database, for the daily AI cost caps. Set `DATABASE_URL=memory` in `.env` for an
+Reports need a database, for the daily report caps. Set `DATABASE_URL=memory` in `.env` for an
 in-memory database built at startup (empty on every start), or a Neon Postgres connection string:
 create its tables once, and after each new migration, with `pnpm --filter server db:migrate`.
 
@@ -39,11 +39,12 @@ pnpm --filter server start   # http://localhost:3000
 
 The server stores anonymous usage counts only: visits and reports with the time, country,
 framework and status. Unique visitors per day come from a hash of the IP with a
-salt that is replaced daily and never stored. No cookies, no IP addresses, and never the need text,
-dependency names or the report. To enforce daily cost limits, the tokens and cost of each AI call
-are stored with the day only, not the time. Signing in with GitHub, where available, stores your
-GitHub name, login, avatar and email and sets a session cookie; no GitHub token and no IP address
-are kept, and deleting the account deletes all of it. See `server/src/db/schema.ts`.
+salt that is replaced daily and never stored. No cookies, no IP addresses (the rate limits hold
+the IP in memory only, up to 24 hours), and never the need text, dependency names or the report.
+To enforce the daily limits and to know what the service costs, the tokens and cost of each AI
+call are stored with the day only, not the time. Signing in with GitHub, where available, stores
+your GitHub name, login, avatar and email and sets a session cookie; no GitHub token and no IP
+address are kept, and deleting the account deletes all of it. See `server/src/db/schema.ts`.
 
 ## Test
 

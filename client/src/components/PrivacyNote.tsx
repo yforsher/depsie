@@ -43,8 +43,8 @@ export function PrivacyNote() {
           {open && <StorageLine />}
           <li>
             The tokens and cost of each AI call are stored with its day (not the time) to enforce
-            daily cost limits, with your account when you are signed in and with the report when it
-            is stored.
+            the daily limits and to know what the service costs, with your account when you are
+            signed in and with the report when it is stored.
           </li>
           <li>
             The server logs and traces, which only the operator can read, keep report ids, times,
@@ -56,7 +56,8 @@ export function PrivacyNote() {
             framework, and success or error status. Unique visitors are counted per day with a hash
             of the IP and a salt that changes daily and is never stored, so visitors cannot be
             identified or followed across days. The IP address, the need, the dependencies and the
-            report are never recorded.
+            report are never recorded. To limit reports without an account, the server holds the IP
+            address in memory only, for up to 24 hours.
           </li>
           <li>
             Package data comes from public sources: npm, deps.dev, OSV.dev, GitHub and jsDelivr.

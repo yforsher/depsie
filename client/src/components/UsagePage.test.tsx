@@ -6,11 +6,11 @@ import { alice, renderAt, stubServer } from '../testRouter';
 const flagsOn = { enabled: ['accounts' as const], signIn: true };
 const usage: UsageResponse = {
   days: [
-    { day: '2026-11-22', reports: 1, tokens: 4321, cost: 0.0023 },
-    { day: '2026-11-21', reports: 2, tokens: 8642, cost: 0.0046 },
+    { day: '2026-11-22', reports: 1, tokens: 4321 },
+    { day: '2026-11-21', reports: 2, tokens: 8642 },
   ],
-  todayCost: 0.0023,
-  dailyCap: 0.25,
+  todayReports: 1,
+  dailyCap: 10,
 };
 
 afterEach(() => {
@@ -18,11 +18,12 @@ afterEach(() => {
 });
 
 describe('/usage', () => {
-  it("shows today's spend against the cap and one row per day, newest first", async () => {
+  it("shows today's reports against the cap and one row per day, newest first, with no dollar amount", async () => {
     stubServer(flagsOn, alice, { '/api/usage': () => Response.json(usage) });
     renderAt('/usage');
 
-    expect(await screen.findByText('Today: $0.0023 of $0.25')).toBeInTheDocument();
+    expect(await screen.findByText('Today: 1 of 10 reports')).toBeInTheDocument();
+    expect(screen.getByRole('main').textContent).not.toContain('$');
     const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
     const cells = rows.map((row) =>
       within(row)
@@ -30,18 +31,18 @@ describe('/usage', () => {
         .map((cell) => cell.textContent),
     );
     expect(cells).toEqual([
-      ['Nov 22, 2026', '1', '4,321', '$0.0023'],
-      ['Nov 21, 2026', '2', '8,642', '$0.0046'],
+      ['Nov 22, 2026', '1', '4,321'],
+      ['Nov 21, 2026', '2', '8,642'],
     ]);
   });
 
   it('says when there is no usage yet', async () => {
     stubServer(flagsOn, alice, {
-      '/api/usage': () => Response.json({ days: [], todayCost: 0, dailyCap: 0.25 }),
+      '/api/usage': () => Response.json({ days: [], todayReports: 0, dailyCap: 10 }),
     });
     renderAt('/usage');
 
-    expect(await screen.findByText('Today: $0.00 of $0.25')).toBeInTheDocument();
+    expect(await screen.findByText('Today: 0 of 10 reports')).toBeInTheDocument();
     expect(screen.getByText(/no usage yet/)).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });

@@ -4,7 +4,7 @@ import { createApp } from './app.js';
 import { openDatabase } from './db/client.js';
 import { fakeFetch } from './fixtureResponses.js';
 
-// The in-memory database the e2e server uses: reports need one for the cost caps.
+// The in-memory database the e2e server uses: reports need one for the daily caps.
 beforeAll(async () => {
   vi.stubEnv('DATABASE_URL', 'memory');
   await openDatabase();
