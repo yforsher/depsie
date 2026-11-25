@@ -437,21 +437,21 @@ usage page shows users what their reports cost the operator, which reads like a 
 tool. A report costs about $0.0023 (`openai/gpt-6-luna`), so counting reports keeps the same cost
 bound and is what users understand.
 
-- [ ] Replace the dollar caps in `server/src/limits.ts` with report counts: 10 reports per UTC day
+- [x] Replace the dollar caps in `server/src/limits.ts` with report counts: 10 reports per UTC day
       per signed-in user, 400 per UTC day shared by all anonymous use (about $1). Remove
       `USER_DAILY_COST` and the anonymous dollar cap; no dollar limit remains
-- [ ] Count today's reports from `ai_usage` rows with source `query_expansion` (one per report
+- [x] Count today's reports from `ai_usage` rows with source `query_expansion` (one per report
       and per refresh, written even when the report then fails), so a refresh counts as a report
       and the check still runs before any AI call; 429 with a message naming the daily limit, 503
       without the database, as today
-- [ ] Keep the hourly limits as they are (10 per hour per signed-in user, else per IP)
-- [ ] Limit anonymous reports to 10 per IP per 24 hours, in server memory next to the hourly limit
+- [x] Keep the hourly limits as they are (10 per hour per signed-in user, else per IP)
+- [x] Limit anonymous reports to 10 per IP per 24 hours, in server memory next to the hourly limit
       (no IP stored), so one visitor cannot use up the shared 400; signed-in users are not counted
       by IP
-- [ ] Usage page: "Today: N of 10 reports" instead of dollars, and the table without the cost
+- [x] Usage page: "Today: N of 10 reports" instead of dollars, and the table without the cost
       column (day, reports, tokens). `GET /api/usage` returns `todayReports` and `dailyCap` (a
       report count) instead of `todayCost`; tokens and cost stay recorded in `ai_usage`
-- [ ] Update the `usage-limits` spec, `server/AGENTS.md`, `client/AGENTS.md` and
+- [x] Update the `usage-limits` spec, `server/AGENTS.md`, `client/AGENTS.md` and
       `docs/product.md` where they name the dollar caps
 
 Tests: a signed-in user's 11th report of the UTC day gets 429 and no AI call, also after a failed
