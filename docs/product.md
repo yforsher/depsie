@@ -37,8 +37,8 @@ A JavaScript or TypeScript developer choosing an npm package for a need in their
   `events` table. The server's logs and traces, which only the operator can read and Google Cloud
   keeps 30 days, hold report ids, exact times, tokens and cost, so a slow or expensive report can
   be followed stage by stage (user's decision, 2026-11-22); the privacy note says so.
-- Signed-in users see their own usage (reports, tokens and cost per day, and today's spend
-  against the daily cap) on a usage page.
+- Signed-in users see their own usage (reports and tokens per day, and today's reports against
+  the daily cap) on a usage page, with no dollar amount.
 - No teams and no package policy; see Later in `plan-platform.md`.
 
 ## Plan parts by use case

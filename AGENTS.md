@@ -57,7 +57,8 @@ step limit and a cost cap enforced in code.
   user id or an IP address. Unique visitors are counted per day with a
   hash of the IP and a random salt that is replaced daily and never stored, so visitors cannot be
   identified or followed across days. No IP addresses stored, and never the need text, dependency
-  names or the report. The `events` table is never linked to users or reports; per-user numbers
+  names or the report; the rate limits hold the IP in server memory only, up to 24 hours for
+  anonymous reports. The `events` table is never linked to users or reports; per-user numbers
   come from the account tables.
 - The only cookies are the session cookie set after signing in, and a short-lived (5 minute) state
   cookie while a sign-in is under way, which protects it against forgery.

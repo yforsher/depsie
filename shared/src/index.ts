@@ -206,13 +206,15 @@ export interface UsageDay {
   reports: number;
   /** Prompt and completion tokens together. */
   tokens: number;
-  /** In US dollars. */
-  cost: number;
 }
 
-/** GET /api/usage: the last 30 UTC days with usage, newest first, and today's spend. */
+/**
+ * GET /api/usage: the last 30 UTC days with usage, newest first, and today's reports against
+ * the daily cap. No cost: that is the operator's, not something the user pays.
+ */
 export interface UsageResponse {
   days: UsageDay[];
-  todayCost: number;
+  todayReports: number;
+  /** Reports per UTC day. */
   dailyCap: number;
 }

@@ -1,10 +1,10 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { and, desc, eq, sql, sum } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import type { RequestHandler } from 'express';
 import type { UsageDay, UsageResponse } from 'shared';
 import { db } from './db/client.js';
 import { aiUsage } from './db/schema.js';
-import { USER_DAILY_COST, utcToday } from './limits.js';
+import { USER_DAILY_REPORTS, utcToday } from './limits.js';
 import { log } from './log.js';
 import type { User } from './users.js';
 
@@ -29,8 +29,8 @@ export function setUsageReport(reportId: string) {
 }
 
 // One ai_usage row per AI call, written as soon as OpenRouter reports the usage, so a call whose
-// answer is rejected afterwards still counts toward the cost caps. Not awaited and only logged on
-// failure, like analytics: the cost cap check before each report fails closed instead.
+// answer is rejected afterwards still counts toward the daily caps. Not awaited and only logged on
+// failure, like analytics: the daily cap check before each report fails closed instead.
 export function recordAiUsage(
   source: string,
   model: string,
@@ -61,7 +61,6 @@ export async function usageOf(userId: string): Promise<UsageResponse> {
       day: aiUsage.day,
       reports: sql`count(*) filter (where ${aiUsage.source} = 'query_expansion')`.mapWith(Number),
       tokens: sql`sum(${aiUsage.prompt_tokens} + ${aiUsage.completion_tokens})`.mapWith(Number),
-      cost: sum(aiUsage.cost).mapWith(Number),
     })
     .from(aiUsage)
     .where(
@@ -69,6 +68,6 @@ export async function usageOf(userId: string): Promise<UsageResponse> {
     )
     .groupBy(aiUsage.day)
     .orderBy(desc(aiUsage.day));
-  const todayCost = days.find((d) => d.day === utcToday())?.cost ?? 0;
-  return { days, todayCost, dailyCap: USER_DAILY_COST };
+  const todayReports = days.find((d) => d.day === utcToday())?.reports ?? 0;
+  return { days, todayReports, dailyCap: USER_DAILY_REPORTS };
 }

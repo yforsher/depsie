@@ -11,8 +11,9 @@ Rules:
   success criteria pass and the user approves.
 - Anonymous use needs no account, as today. Chat and MCP are for signed-in users only.
 - Permissions, limits and data rules are enforced in code, never by the model.
-- Every agent feature has a cost cap and a step limit in code, counts toward the user's daily cost
-  cap, and is measured with the eval suite before it is turned on for everyone.
+- Every agent feature has a cost cap and a step limit in code, counts toward the user's daily
+  report cap (each part says what one chat turn or MCP call counts as), and is measured with the
+  eval suite before it is turned on for everyone.
 - Existing functionality keeps working after every part: all existing tests and the smoke test
   pass, in CI and against the new revision before it gets traffic. A test changes only when the behavior
   change is intended, and the commit says why.

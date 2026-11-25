@@ -40,7 +40,7 @@ export const events = pgTable(
   (table) => [check('events_kind_check', sql`${table.kind} in ('visit', 'report')`)],
 );
 
-// One row per AI call, with the signed-in user (null when anonymous). The daily cost caps and the
+// One row per AI call, with the signed-in user (null when anonymous). The daily report caps and the
 // usage page read only this table; the anonymous events table is never linked to users.
 export const aiUsage = pgTable(
   'ai_usage',

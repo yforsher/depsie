@@ -24,6 +24,7 @@ beforeAll(async () => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   await db().execute(sql`delete from "user"`);
   await db().execute(sql`delete from ai_usage`);
@@ -234,10 +235,11 @@ describe('limits for signed-in users', () => {
   const invalid = { need: '', framework: 'React' };
   const valid = { need: 'validate forms', framework: 'React' };
 
-  async function spend(userId: string | null, cost: number) {
+  // `count` reports run today by the user, or anonymously: one query expansion call each.
+  async function reportsRun(userId: string | null, count: number) {
     await db().execute(
       sql`insert into ai_usage (user_id, source, model, prompt_tokens, completion_tokens, cost)
-          values (${userId}, 'comparison', 'm', 1, 1, ${cost})`,
+          select ${userId}, 'query_expansion', 'm', 1, 1, 0.001 from generate_series(1, ${count})`,
     );
   }
 
@@ -255,12 +257,31 @@ describe('limits for signed-in users', () => {
     expect((await post(alice.cookie)).status).toBe(429);
   });
 
-  it('refuses a user who has spent $0.25 today, without blocking other users', async () => {
+  it('does not count signed-in users toward the per-IP daily limit of anonymous reports', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const alice = await signedInUser('alice');
+    const app = createApp(clientDir);
+    for (let i = 0; i < 10; i++) {
+      expect((await request(app).post('/api/report').send(invalid)).status).toBe(400);
+    }
+    // Past the hourly window: the IP has used its anonymous reports for the day.
+    vi.setSystemTime(Date.now() + 61 * 60 * 1000);
+    expect((await request(app).post('/api/report').send(invalid)).status).toBe(429);
+
+    const response = await request(app)
+      .post('/api/report')
+      .set('Cookie', alice.cookie)
+      .send(invalid);
+    expect(response.status).toBe(400);
+  });
+
+  it('refuses a user who has run 10 reports today, without blocking other users', async () => {
     vi.stubGlobal('fetch', vi.fn(fakeFetch));
     const alice = await signedInUser('alice');
     const bob = await signedInUser('bob');
-    await spend(alice.id, 0.25);
-    await spend(null, 1);
+    await reportsRun(alice.id, 10);
+    await reportsRun(bob.id, 9);
+    await reportsRun(null, 400);
     const app = createApp(clientDir);
 
     const refused = await request(app).post('/api/report').set('Cookie', alice.cookie).send(valid);
@@ -297,7 +318,7 @@ describe('GET /api/usage', () => {
     );
   }
 
-  it("returns the user's reports, tokens and cost per day, newest first, with today's cost and the cap", async () => {
+  it("returns the user's reports and tokens per day, newest first, with today's reports and the cap, and no cost", async () => {
     const alice = await signedInUser('alice');
     const bob = await signedInUser('bob');
     // Today one report, yesterday two (each a query expansion and a comparison).
@@ -319,21 +340,21 @@ describe('GET /api/usage', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       days: [
-        { day: utcDay(0), reports: 1, tokens: 300, cost: 0.003 },
-        { day: utcDay(1), reports: 2, tokens: 600, cost: 0.006 },
+        { day: utcDay(0), reports: 1, tokens: 300 },
+        { day: utcDay(1), reports: 2, tokens: 600 },
       ],
-      todayCost: 0.003,
-      dailyCap: 0.25,
+      todayReports: 1,
+      dailyCap: 10,
     });
   });
 
-  it('returns no days and nothing spent today for a user without usage', async () => {
+  it('returns no days and no reports today for a user without usage', async () => {
     const alice = await signedInUser('alice');
     const response = await request(createApp(clientDir))
       .get('/api/usage')
       .set('Cookie', alice.cookie);
 
-    expect(response.body).toEqual({ days: [], todayCost: 0, dailyCap: 0.25 });
+    expect(response.body).toEqual({ days: [], todayReports: 0, dailyCap: 10 });
   });
 
   it('is 401 without a session', async () => {

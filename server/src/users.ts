@@ -16,7 +16,7 @@ export function loadUser(auth: Auth): RequestHandler {
         returnHeaders: true,
       });
     } catch (error) {
-      // The session is a database row: without the database, answer like the cost check does.
+      // The session is a database row: without the database, answer like the daily cap check does.
       log(`session lookup failed: ${(error as Error).message}`, 'ERROR');
       res.status(503).json({ error: UNAVAILABLE });
       return;

@@ -25,8 +25,9 @@ The server is the only place that holds API keys (`OPENROUTER_API_KEY`, `GITHUB_
 - `GET /api/usage` (same flag): the signed-in user's AI usage from `ai_usage` only, as
   `UsageResponse` (`shared/`): per UTC day with usage in the last 30 days, newest first, the
   reports run (rows with source `query_expansion`: every report and refresh makes that call once),
-  tokens (prompt plus completion) and cost, plus today's cost and the daily cap
-  (`USER_DAILY_COST`); `usageOf()` in `src/usage.ts`. 401 without a session.
+  and tokens (prompt plus completion), plus today's reports and the daily cap in reports
+  (`USER_DAILY_REPORTS`), and no cost: the user does not pay for it; `usageOf()` in
+  `src/usage.ts`. 401 without a session.
 - `GET /api/reports/:id?version=N` (same flag): the owner's report as `OwnedReport`, version N or
   the latest without `version`, with `version` (the one shown) and `versions` (number, source,
   time, oldest first). Missing, expired, another user's, anonymous or non-uuid ids, and a version
@@ -37,7 +38,7 @@ The server is the only place that holds API keys (`OPENROUTER_API_KEY`, `GITHUB_
   need, framework and dependencies, appends a version with source `refresh` (which restarts the
   100-day retention) and returns the new version as `OwnedReport`. Checks run in this order:
   401 without a session, 404 unless it is the caller's unexpired report, then the same hourly
-  limit instance and daily cost cap as `POST /api/report` (429, or 503 without the database), so
+  limit instance and daily report cap as `POST /api/report` (429, or 503 without the database), so
   a stranger spends no one's limit and causes no AI call. Its `ai_usage` rows carry the report
   id; it writes no `events` row, since per-user numbers come from the account tables.
 - `POST /api/reports/:id/share` (while `accounts` or `report-links` is not off) creates the share
@@ -50,8 +51,9 @@ The server is the only place that holds API keys (`OPENROUTER_API_KEY`, `GITHUB_
   (`report-links`) deletes an anonymous report by its link; a signed-in report gets 404. This
   endpoint and the app shell at `/s/*` send `X-Robots-Tag: noindex` and
   `Referrer-Policy: no-referrer`, since a link is a secret.
-- `POST /api/report` has an hourly rate limit (per signed-in user, else per IP) and daily AI cost
-  caps (per user, and one shared by all anonymous use) to keep costs predictable.
+- `POST /api/report` has an hourly rate limit (per signed-in user, else per IP), a daily limit per
+  IP for anonymous reports, and daily caps counted in reports (per user, and one shared by all
+  anonymous use) to keep costs predictable.
 - In production, Express also serves the built client (`client/dist`) with SPA fallback.
 
 ## AI usage
@@ -102,7 +104,8 @@ failing the request.
   file are written.
 - `ai_usage` (`src/db/schema.ts`): one row per AI call, with the signed-in user or none and the
   saved report or none (`report_id`, no foreign key: the row is written before the report row
-  exists); the cost caps read only this table. It is separate from `events`, which is never linked to users.
+  exists); the daily caps count its `query_expansion` rows and read no other table. It is
+  separate from `events`, which is never linked to users.
 - Schema changes: edit `src/db/schema.ts`, run `pnpm db:generate`, and commit the generated
   migration in `drizzle/` with the pull request. Never `drizzle-kit push`, never change the
   `production` branch by hand. Migrations only go forward: no down migrations; a mistake is
@@ -236,16 +239,22 @@ failing the request.
   to `X-Forwarded-For`, so `req.ip` (used by the rate limit and analytics) is its last entry and a
   client cannot fake it.
 - `POST /api/report` in `src/app.ts`: rate limited to 10 per hour per signed-in user, else per IP
-  (429), then the daily cost cap (`checkCostCap`), Zod validation (400), then `generateReport()`; `AiError` becomes 502
+  (429), then the daily report cap (`checkDailyCap`), then for anonymous use to 10 per IP in 24
+  hours (429, a second `rateLimit` in memory, so no IP is stored, skipped for signed-in users; it
+  comes after the daily cap so reports the cap refuses do not use up the IP's; each IP's window
+  starts at its first report, and a restart resets it), Zod validation (400), then
+  `generateReport()`; `AiError` becomes 502
   with the message, and the rejected model output is logged as an `ERROR` line (never stored, and
   never on a span) so failures can be investigated. The last error handler in `createApp()` answers
   any other failure with a JSON 500 and logs only the error's name (`request failed: <name>`): a
   database error's message lists the query parameters and a JSON parse error quotes the body,
   which can hold the need. A client error (4xx, such as malformed JSON) keeps its status.
-- `src/limits.ts`: every limit on reports as a constant (reports per hour, the daily AI cost cap of
-  $0.25 per signed-in user and $1 shared by all anonymous use) and `checkCostCap`, which sums
-  today's (UTC) `ai_usage.cost` for the user, or for all anonymous use, before any AI call: 429 at
-  or above the cap, 503 when the database cannot be reached, so no report runs unchecked.
+- `src/limits.ts`: every limit on reports as a constant, counted in reports and never in dollars
+  (reports per hour, anonymous reports per IP per day, and the daily caps of 10 per signed-in user
+  and 400 shared by all anonymous use) and `checkDailyCap`, which counts today's (UTC) `ai_usage`
+  rows with source `query_expansion` (one per report or refresh, written even when the report then
+  fails) for the user, or for all anonymous use, before any AI call: 429 at or above the cap, 503
+  when the database cannot be reached, so no report runs unchecked.
   `loadUser` also answers 503 when the session cannot be read.
 - `src/usage.ts`: `recordAiUsage()`, called by `chatJson()` as soon as OpenRouter reports the
   usage (so a rejected answer still counts), writes one `ai_usage` row per AI call (source is the

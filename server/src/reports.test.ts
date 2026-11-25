@@ -473,12 +473,13 @@ describe('POST /api/reports/:id/refresh', () => {
     expect(await rows(sql`select version from report_versions`)).toHaveLength(10);
   });
 
-  it('is refused at the daily cost cap, with no AI call', async () => {
+  it('is refused at the daily report cap, with no AI call and no version', async () => {
     const app = appWith({ accounts: 'on' });
     const { alice, id } = await aliceReport(app);
+    // aliceReport clears its usage rows, so all 10 of today's reports are inserted here.
     await db()
-      .execute(sql`insert into ai_usage (user_id, source, model, prompt_tokens, completion_tokens, cost, day)
-      values (${alice.id}, 'comparison', 'm', 1, 1, 0.25, (now() at time zone 'utc')::date)`);
+      .execute(sql`insert into ai_usage (user_id, source, model, prompt_tokens, completion_tokens, cost)
+      select ${alice.id}, 'query_expansion', 'm', 1, 1, 0.001 from generate_series(1, 10)`);
     vi.mocked(fetch).mockClear();
 
     const response = await request(app)
@@ -487,6 +488,7 @@ describe('POST /api/reports/:id/refresh', () => {
 
     expect(response.status).toBe(429);
     expect(outsideCalls()).toBe(0);
+    expect(await rows(sql`select version from report_versions`)).toHaveLength(1);
   });
 });
 
